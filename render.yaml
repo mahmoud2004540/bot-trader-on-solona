@@ -1,0 +1,29 @@
+# One-click deploy on Render (see README → "Website on your phone (Render, one button)").
+# Render asks for the two `sync: false` values (your password and wallet key) on the
+# deploy page itself; they are stored as encrypted env vars, never in this repo.
+services:
+  - type: web
+    name: grok-bot-terminal
+    runtime: node
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    # exactly one copy: two bots must never trade the same wallet (a disk also prevents scaling)
+    numInstances: 1
+    # don't restart the bot by itself on every git push; redeploy by hand when you want to
+    autoDeployTrigger: "off"
+    disk:
+      name: grok-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: CLOUD
+        value: "1"
+      - key: DATA_DIR
+        value: /data
+      - key: NODE_VERSION
+        value: "22"
+      - key: DASHBOARD_TOKEN
+        sync: false
+      - key: SOLANA_PRIVATE_KEY
+        sync: false
