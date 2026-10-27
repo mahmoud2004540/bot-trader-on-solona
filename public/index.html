@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grok Bot Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="window">
+  <!-- window bar -->
+  <div class="winbar">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <div class="wintitle">Grok Bot Terminal — overnight · six agents · log first</div>
+    <button id="modeToggle" class="pill live" type="button" aria-label="toggle paper / live">
+      <span class="seg seg-paper">paper <b id="paperState">off</b></span>
+      <span class="sep">·</span>
+      <span class="seg seg-live"><span class="livedot"></span>live</span>
+    </button>
+  </div>
+
+  <!-- header -->
+  <header class="hdr">
+    <div class="brand">
+      <div class="logo"><i></i><i></i></div>
+      <div class="brand-text">
+        <div class="title-row">
+          <h1>Grok Bot Terminal</h1>
+          <span class="ver">v1.0-night</span>
+        </div>
+        <div class="status-row">
+          <span class="running"><span class="dot-green"></span>running <span id="uptime" class="mono">00:00:00</span></span>
+          <span id="lastEvent" class="evt-badge">BOOT · LOGGING ON</span>
+        </div>
+        <div class="tagline">every trade gets a reason <span id="notice" class="notice"></span></div>
+      </div>
+    </div>
+    <div class="bigstats">
+      <div class="bs"><div class="bs-k">balance</div><div id="sBalance" class="bs-v mono">$0.00</div></div>
+      <div class="bs"><div class="bs-k">trades</div><div id="sTrades" class="bs-v mono">0</div></div>
+      <div class="bs"><div class="bs-k">wins</div><div id="sWins" class="bs-v mono green">0</div></div>
+      <div class="bs"><div class="bs-k">losses</div><div id="sLosses" class="bs-v mono red">0</div></div>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- agents -->
+    <aside class="panel agents">
+      <div class="panel-h"><span>AGENTS</span><span class="muted">· <b id="online">6</b> online</span></div>
+      <div id="agentList" class="agent-list"></div>
+    </aside>
+
+    <!-- center -->
+    <section class="center">
+      <div class="panel flow">
+        <div class="panel-h">
+          <span>LIVE FLOW <span class="muted">· SCAN → CHECK → SIZE → EXEC → LOG</span></span>
+          <span class="muted mono">checked <b id="checked">0</b></span>
+        </div>
+        <div id="candidates" class="cands"></div>
+
+        <div class="graph-wrap">
+          <svg id="graph" viewBox="0 0 640 210" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <filter id="glowR" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
+              <filter id="glowT" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" /></filter>
+            </defs>
+            <path id="link1" class="link" d="M150 105 C 200 105, 220 105, 272 105" />
+            <path id="link2" class="link" d="M368 105 C 420 105, 440 105, 492 105" />
+            <text x="430" y="82" class="g-label" text-anchor="middle">pass → size → enter</text>
+
+            <g id="nodeToken" class="node">
+              <rect x="22" y="78" width="128" height="54" rx="12" class="tok-rect" />
+              <text id="gTicker" x="86" y="103" text-anchor="middle" class="g-ticker">—</text>
+              <text id="gStage" x="86" y="121" text-anchor="middle" class="g-sub">idle</text>
+            </g>
+            <g id="nodeRug" class="node">
+              <circle cx="320" cy="105" r="46" class="glow-r" filter="url(#glowR)" />
+              <circle cx="320" cy="105" r="44" class="circ-r" />
+              <text x="320" y="101" text-anchor="middle" class="g-node r">RUG</text>
+              <text x="320" y="118" text-anchor="middle" class="g-node r">CHECK</text>
+            </g>
+            <g id="nodeExec" class="node">
+              <circle cx="540" cy="105" r="46" class="glow-t" filter="url(#glowT)" />
+              <circle cx="540" cy="105" r="44" class="circ-t" />
+              <text x="540" y="110" text-anchor="middle" class="g-node t">EXECUTOR</text>
+            </g>
+          </svg>
+          <div id="stamp" class="stamp hidden"><div class="stamp-k">FILTERED</div><div id="stampReason" class="stamp-r"></div></div>
+        </div>
+
+        <div class="mini">
+          <div class="mini-h"><span class="muted">equity</span><span id="miniLabel" class="mono">no closes yet</span></div>
+          <svg id="miniChart" viewBox="0 0 600 90" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="eqFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stop-color="var(--blue)" stop-opacity=".35" />
+                <stop offset="1" stop-color="var(--blue)" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+            <path id="eqArea" fill="url(#eqFill)" />
+            <path id="eqLine" class="eq-line" />
+            <circle id="eqDot" r="4" class="eq-dot" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="stats4">
+        <div class="stat c-rug"><div class="stat-k">FILTERED</div><div id="stFiltered" class="stat-v mono">0</div><div id="stSkipped" class="stat-s">0 skipped</div></div>
+        <div class="stat c-sizer"><div class="stat-k">SIZER</div><div id="stSizer" class="stat-v mono">—</div><div id="stSizerS" class="stat-s">idle</div></div>
+        <div class="stat c-logger"><div class="stat-k">LOGGER</div><div id="stLogger" class="stat-v mono">line #0</div><div class="stat-s">each with a reason</div></div>
+        <div class="stat c-equity"><div class="stat-k">EQUITY</div><div id="stEquity" class="stat-v mono">$0.00</div><div class="stat-s">last close</div></div>
+      </div>
+    </section>
+
+    <!-- right -->
+    <section class="right">
+      <div class="panel trade">
+        <div class="panel-h"><span>TRADE <span class="muted">· ENTRY vs EXIT</span></span><span id="tBadge" class="badge dim">—</span></div>
+        <div class="trade-top">
+          <div><span id="tTicker" class="t-ticker mono">no trade yet</span> <span class="badge long">LONG</span></div>
+          <div id="tPnl" class="t-pnl mono">$0.00</div>
+        </div>
+        <div class="t-grid">
+          <div><div class="t-k">entry</div><div id="tEntry" class="t-v mono">—</div></div>
+          <div><div class="t-k">exit</div><div id="tExit" class="t-v mono">—</div></div>
+          <div><div class="t-k">slip</div><div id="tSlip" class="t-v mono">—</div></div>
+          <div><div class="t-k">size</div><div id="tSize" class="t-v mono">—</div></div>
+        </div>
+        <div class="t-reason"><span class="t-k">reason</span><div id="tReason" class="orange mono">—</div></div>
+      </div>
+
+      <div class="panel tail">
+        <div class="panel-h"><span class="mono">$ tail -f night.log</span><span id="tailCount" class="muted mono">0 lines</span></div>
+        <div id="tail" class="tail-body mono"></div>
+      </div>
+
+      <div class="panel result">
+        <div class="panel-h"><span>RESULT <span class="muted">· start vs now</span></span><span id="range" class="muted mono">--:-- → --:--</span></div>
+        <div class="res-row"><span class="res-k">START</span><div class="bar"><i id="barStart"></i></div><span id="resStart" class="mono">$0.00</span></div>
+        <div class="res-row"><span class="res-k">NOW</span><div class="bar now"><i id="barNow"></i></div><span id="resNow" class="mono">$0.00</span></div>
+        <div class="res-foot mono"><span id="resWL">0W / 0L</span><span id="resDelta">+0.0%</span></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="panel feed">
+    <div class="panel-h"><span>LOG FEED</span><span class="muted">newest first</span></div>
+    <div id="feed" class="feed-body"></div>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
