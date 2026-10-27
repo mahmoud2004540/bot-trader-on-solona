@@ -52,7 +52,12 @@ export function startServer() {
 
   const wss = new WebSocketServer({ server: http, path: "/ws" });
   wss.on("connection", (ws, req) => {
-    if (!authorized(req)) return ws.close(4001, "token required");
+    if (!authorized(req)) {
+      // Say it in a message too: proxies in front of cloud hosts (e.g. Cloudflare on Render)
+      // can drop the custom close code, and then the page couldn't tell "locked" from "offline".
+      ws.send(JSON.stringify({ type: "locked" }));
+      return ws.close(4001, "token required");
+    }
     ws.send(json({ type: "state", state: { ...state, log: undefined } }));
     ws.send(json({ type: "history", entries: state.log }));
     ws.on("message", (raw) => {
