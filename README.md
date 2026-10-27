@@ -13,6 +13,33 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Phone only and free: Android + Termux
+
+On an **Android** phone the bot can run on the phone itself, for free (iPhone can't do this).
+Keep the phone **charging and on Wi-Fi** all night.
+
+1. Install **Termux** from F-Droid (f-droid.org). The Play Store version is outdated.
+2. Open Termux and paste this once:
+   ```
+   pkg update -y && pkg install -y nodejs-lts git && git clone --depth 1 -b claude/grok-bot-terminal-solana-fbkj8n https://github.com/mahmoud2004540/bot-trader-on-solona grok && cd grok && bash start.sh
+   ```
+   It installs everything, opens the dashboard in the phone's browser (`http://127.0.0.1:8787`) and
+   takes a wake lock so Android doesn't pause it.
+3. Connect Phantom with the card in the dashboard, exactly as on a computer: paste the Grok Bot
+   account's key and send USDC/SOL to it.
+4. Android settings → Apps → Termux → Battery → **Unrestricted** (otherwise Android may kill it at night).
+
+Next time just open Termux and run `cd grok && bash start.sh`. To stop it, press Ctrl+C in Termux.
+
+### أندرويد ببلاش (بالعربي)
+1. نزّل **Termux** من F-Droid (موقع f-droid.org). نسخة جوجل بلاي قديمة.
+2. افتح Termux والصق السطر اللي فوق مرة واحدة. هيسطّب كل حاجة ويفتح الداشبورد في متصفح التليفون.
+3. اربط فانتوم من الكارت اللي في الداشبورد، وابعت USDC أو SOL لحساب Grok Bot.
+4. الإعدادات ← التطبيقات ← Termux ← البطارية ← **Unrestricted** (غير مقيّد).
+5. خلّي التليفون على الشاحن وعلى الواي فاي طول الليل.
+
+المرة الجاية: افتح Termux واكتب `cd grok && bash start.sh`.
+
 ## Phone only, no computer: run it in the cloud (Railway)
 
 The bot can't run on a phone overnight, because the phone sleeps and closes the app. Instead it runs
@@ -192,9 +219,9 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `.env.example` | Every setting, documented. Copy it to `.env`. |
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
-| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit). |
+| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit / termux-wake-lock on Android). |
 | `src/funding.ts` | Wallet watcher (live only). Shows SOL/USDC on the dashboard, holds trading quietly until there is at least $5 USDC, converts deposited SOL to USDC (keeping 0.05 SOL for fees), and moves START to the deposited amount before the first trade. |
-| `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
+| `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). `start.sh` also runs on Android in Termux: it installs Node with `pkg` and opens the dashboard with `termux-open-url`. They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
 | `railway.json` / `.nvmrc` | Cloud deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
 | `.gitattributes` | Keeps Windows line endings for the `.bat` and Unix line endings for the shell launchers. |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |

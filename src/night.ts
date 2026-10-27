@@ -7,6 +7,13 @@ import { spawn, type ChildProcess } from "node:child_process";
 function keepAwake(): ChildProcess | null {
   const opts = { stdio: "ignore" as const };
   let p: ChildProcess | null = null;
+  if (process.platform === "android") {
+    // Termux: a wake lock keeps Android from pausing the bot when the screen turns off.
+    p = spawn("termux-wake-lock", [], opts);
+    process.on("exit", () => spawn("termux-wake-unlock", [], opts));
+    p.on("error", () => console.warn("[night] couldn't take a wake lock — keep Termux open and the phone charging"));
+    return p;
+  }
   if (process.platform === "darwin") p = spawn("caffeinate", ["-i", "-w", String(process.pid)], opts);
   else if (process.platform === "win32") {
     const ps =
