@@ -12,6 +12,7 @@ import { bus, state } from "./state.js";
 import { connectWallet, redact, walletPublicKey } from "./security/wallet.js";
 import { goLiveWhenFlat, setMode } from "./orchestrator.js";
 import { update } from "./state.js";
+import { isValidBotToken, startTelegram } from "./telegram.js";
 
 const PUBLIC = join(process.cwd(), "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml" };
@@ -45,35 +46,62 @@ const ENV_PATH = join(process.cwd(), ".env");
  *  - only while no wallet is connected; it can't replace an existing key
  * The key is saved into .env (SOLANA_PRIVATE_KEY, file mode 600) and never sent back.
  */
-async function handleSetup(req: IncomingMessage): Promise<[number, object]> {
+type Reply = [number, object];
+
+/** Checks shared by every "paste a secret here" endpoint (wallet key, Telegram token). */
+function localOnly(req: IncomingMessage, cloudHint: string): Reply | null {
   const host = String(req.headers.host ?? "").replace(/:\d+$/, "");
   const origin = req.headers.origin;
-  if (CLOUD) return [403, { error: "in the cloud, add SOLANA_PRIVATE_KEY in the service's Variables instead" }];
+  if (CLOUD) return [403, { error: cloudHint }];
   if (!isLocal(req) || !["127.0.0.1", "localhost", "[::1]"].includes(host))
-    return [403, { error: "setup only works on this computer: open http://127.0.0.1:" + CONFIG.port }];
+    return [403, { error: "setup only works on this device: open http://127.0.0.1:" + CONFIG.port }];
   if (origin && origin !== `http://${req.headers.host}`) return [403, { error: "cross-site request refused" }];
   if (!String(req.headers["content-type"]).startsWith("application/json")) return [415, { error: "json only" }];
-  if (walletPublicKey()) return [409, { error: "a wallet is already connected" }];
+  return null;
+}
 
+async function readField(req: IncomingMessage, field: string): Promise<string | null> {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 4096) return [413, { error: "too large" }];
+    if (body.length > 4096) return null;
   }
-  let secret = "";
   try {
-    secret = String(JSON.parse(body).secret ?? "").trim();
-  } catch {}
+    return String(JSON.parse(body)[field] ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Set one VAR=value line in .env (file mode 600), keeping every other line. */
+async function saveEnvVar(name: string, value: string) {
+  const prev = existsSync(ENV_PATH) ? await readFile(ENV_PATH, "utf8") : "";
+  const kept = prev.split("\n").filter((l) => l.trim() && !new RegExp(`^\\s*${name}\\s*=`).test(l));
+  await writeFile(ENV_PATH, [...kept, `${name}=${value}`].join("\n") + "\n", { mode: 0o600 });
+  await chmod(ENV_PATH, 0o600).catch(() => {});
+}
+
+/**
+ * POST /api/setup {secret}: one-time wallet connection from the dashboard.
+ * Locked down because whoever sets the key decides which wallet you fund:
+ *  - only from this device (loopback socket), with a localhost Host header (no DNS rebinding)
+ *  - same-origin only and JSON-only, so other websites can't POST here (CSRF)
+ *  - only while no wallet is connected; it can't replace an existing key
+ * The key is saved into .env (SOLANA_PRIVATE_KEY, file mode 600) and never sent back.
+ */
+async function handleSetup(req: IncomingMessage): Promise<Reply> {
+  const denied = localOnly(req, "in the cloud, add SOLANA_PRIVATE_KEY in the service's Variables instead");
+  if (denied) return denied;
+  if (walletPublicKey()) return [409, { error: "a wallet is already connected" }];
+  let secret = await readField(req, "secret");
+  if (secret === null) return [413, { error: "too large" }];
   let pub;
   try {
     pub = connectWallet(secret);
   } catch {
     return [400, { error: "that doesn't look like a Solana private key — copy it again from Phantom" }];
   }
-  const prev = existsSync(ENV_PATH) ? await readFile(ENV_PATH, "utf8") : "";
-  const kept = prev.split("\n").filter((l) => l.trim() && !/^\s*SOLANA_PRIVATE_KEY\s*=/.test(l));
-  await writeFile(ENV_PATH, [...kept, `SOLANA_PRIVATE_KEY=${secret}`].join("\n") + "\n", { mode: 0o600 });
-  await chmod(ENV_PATH, 0o600).catch(() => {});
+  await saveEnvVar("SOLANA_PRIVATE_KEY", secret);
   secret = "";
   update((s) => {
     s.liveAvailable = true;
@@ -85,15 +113,33 @@ async function handleSetup(req: IncomingMessage): Promise<[number, object]> {
   return [200, { ok: true, address: pub.toBase58() }];
 }
 
+/** POST /api/telegram {token}: same protections; the token is checked with Telegram (getMe) before it's saved. */
+async function handleTelegram(req: IncomingMessage): Promise<Reply> {
+  const denied = localOnly(req, "in the cloud, add TELEGRAM_BOT_TOKEN in the service's Variables instead");
+  if (denied) return denied;
+  if (state.telegram.enabled) return [409, { error: "Telegram is already connected" }];
+  const tok = await readField(req, "token");
+  if (tok === null) return [413, { error: "too large" }];
+  if (!isValidBotToken(tok)) return [400, { error: "that doesn't look like a bot token from @BotFather (it looks like 123456789:AA…)" }];
+  try {
+    const bot = await startTelegram(tok);
+    await saveEnvVar("TELEGRAM_BOT_TOKEN", tok);
+    return [200, { ok: true, bot, code: state.telegram.code }];
+  } catch {
+    return [400, { error: "Telegram rejected that token — copy it again from @BotFather" }];
+  }
+}
+
 export function startServer() {
   const http = createServer(async (req, res) => {
     if (CLOUD && !CONFIG.dashboardToken) return void res.writeHead(503, { "content-type": "text/plain; charset=utf-8" }).end(CLOUD_NO_TOKEN);
     // The page's HTML/CSS/JS are static and hold no data; everything live (state, log, the
     // mode toggle) goes over the WebSocket, which is where the token is enforced.
-    if (req.url?.startsWith("/api/setup")) {
+    const api = req.url?.startsWith("/api/setup") ? handleSetup : req.url?.startsWith("/api/telegram") ? handleTelegram : null;
+    if (api) {
       if (!authorized(req)) return void res.writeHead(401).end();
       if (req.method !== "POST") return void res.writeHead(405).end();
-      const [code, body] = await handleSetup(req).catch(() => [500, { error: "setup failed" }] as [number, object]);
+      const [code, body] = await api(req).catch(() => [500, { error: "setup failed" }] as Reply);
       return void res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));
     }
     const path = new URL(req.url ?? "/", "http://x").pathname;

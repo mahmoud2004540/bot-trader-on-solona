@@ -25,6 +25,8 @@ export const CONFIG = {
   host: env("HOST", CLOUD ? "0.0.0.0" : "127.0.0.1"),
   port: Number(env("PORT", "8787")),
   dashboardToken: env("DASHBOARD_TOKEN"),
+  telegramToken: env("TELEGRAM_BOT_TOKEN"),
+  telegramApi: env("TELEGRAM_API_BASE", "https://api.telegram.org"),
   dataDir: env("DATA_DIR", VOLUME || (DEMO ? "data/demo" : "data")),
   /** live trading in the cloud needs a persistent volume (see VOLUME above) */
   cloudVolume: Boolean(VOLUME),

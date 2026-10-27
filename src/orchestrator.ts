@@ -1,7 +1,7 @@
 // Wires the six agents into one pipeline:  SCAN → CHECK → SIZE → EXEC → LOG → EQUITY.
 // One position at a time: while a position is open the loop only monitors it.
 import { CLOUD, CONFIG } from "./config.js";
-import { state, update, setAgent } from "./state.js";
+import { bus, state, update, setAgent } from "./state.js";
 import { redact, walletPublicKey } from "./security/wallet.js";
 import { scan } from "./agents/scanner.js";
 import { rugCheck } from "./agents/rugCheck.js";
@@ -22,6 +22,12 @@ let busy = false; // true while a swap is in flight; blocks mode switches
 /** Cloud without a volume: a redeploy would wipe the saved open position, so no live trading. */
 export const liveBlockedReason = () =>
   CLOUD && !CONFIG.cloudVolume ? "attach a Volume to the service (mount path /data) to go live" : null;
+
+export function setPaused(paused: boolean) {
+  update((s) => (s.paused = paused));
+  setAgent("scanner", paused ? "PAUSED" : "SCAN", paused ? "paused · no new entries" : "resumed", false);
+  wake?.();
+}
 
 // Mode changes are queued and applied by the loop between scans, never in the middle of one,
 // so a token checked and sized in paper can't end up bought with real money (and vice versa).
@@ -62,6 +68,8 @@ async function applyPendingMode() {
   await equity.startSession(mode, { resume: false });
 }
 
+let lastExitAlert = 0;
+
 async function manageOpenPosition(market: Market) {
   const pos = state.position!;
   const exitReason = await executor.monitor(market, pos);
@@ -82,6 +90,10 @@ async function manageOpenPosition(market: Market) {
   } catch (e) {
     // Stay in the position and retry with a fresh quote next tick (cap stays 2%).
     setAgent("executor", "LONG", `exit retry · ${redact((e as Error).message).slice(0, 50)}`);
+    if (Date.now() - lastExitAlert > 10 * 60_000) {
+      lastExitAlert = Date.now();
+      bus.emit("alert", `⚠️ can't exit ${pos.ticker} yet (${redact((e as Error).message).slice(0, 80)}). Retrying every few seconds.`);
+    }
   } finally {
     busy = false;
   }
@@ -167,7 +179,8 @@ export async function run(market: Market) {
       if (state.position) await manageOpenPosition(market);
       else {
         await applyPendingMode();
-        if (await fundingTick()) await hunt(market);
+        if ((await fundingTick()) && !state.paused) await hunt(market);
+        else if (state.paused) setAgent("scanner", "PAUSED", "paused · /resume to trade again", false);
       }
     } catch (e) {
       console.error("[loop]", redact(String((e as Error)?.message ?? e)));

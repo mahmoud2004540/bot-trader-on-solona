@@ -13,6 +13,36 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Telegram: alerts and control from your phone
+
+Telegram is the remote control; the bot itself still runs on your computer, Android phone (Termux)
+or server.
+
+1. In Telegram open **@BotFather**, send `/newbot`, pick a name and a username ending in `bot`, and copy the token.
+2. Dashboard → **TELEGRAM** card → **connect Telegram** → paste the token. In the cloud, add
+   `TELEGRAM_BOT_TOKEN` in the Variables instead.
+3. Tap **tap to pair** on the card, then press **Start** in Telegram. Only that Telegram account
+   controls the bot from now on.
+
+You get a message on every **ENTER** and **EXIT** (with the reason, PnL and new balance), on every SOL
+conversion, and if an exit keeps failing. Commands: `/status`, `/report`, `/log`, `/pause`,
+`/resume`, `/paper`, `/live` (asks for `/live yes`), `/filtered on|off`.
+
+Safety:
+- pairing uses a one-time code shown only on the dashboard; every other chat is ignored silently;
+- the wallet key is never accepted over Telegram, and a message that looks like one is deleted
+  immediately;
+- messages are plain text (no Markdown/HTML), so token names can't inject links;
+- the bot token is kept out of every log and error.
+
+### تليجرام (بالعربي)
+1. في تليجرام افتح **‎@BotFather‎** وابعت ‎/newbot‎، اختار اسم ويوزرنيم آخره bot، وانسخ التوكن.
+2. في الداشبورد: كارت **TELEGRAM** ← **connect Telegram** ← الصق التوكن.
+3. دوس **tap to pair** وبعدين **Start** في تليجرام.
+
+هيوصلك رسالة مع كل شراء وبيع. الأوامر: ‎/status‎ و‎/report‎ و‎/pause‎ و‎/resume‎ و‎/live‎ و‎/paper‎.
+**عمرك ما تبعت مفتاح المحفظة في تليجرام.** لو بعته بالغلط، البوت بيمسحه.
+
 ## Phone only and free: Android + Termux
 
 On an **Android** phone the bot can run on the phone itself, for free (iPhone can't do this).
@@ -220,6 +250,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
 | `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit / termux-wake-lock on Android). |
+| `src/telegram.ts` | Telegram remote control: pairing with a dashboard code, owner-only commands (`/status /report /log /pause /resume /paper /live /filtered`), ENTER/EXIT/warning alerts, deletes anything that looks like a private key, plain-text messages only. |
 | `src/funding.ts` | Wallet watcher (live only). Shows SOL/USDC on the dashboard, holds trading quietly until there is at least $5 USDC, converts deposited SOL to USDC (keeping 0.05 SOL for fees), and moves START to the deposited amount before the first trade. |
 | `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). `start.sh` also runs on Android in Termux: it installs Node with `pkg` and opens the dashboard with `termux-open-url`. They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
 | `railway.json` / `.nvmrc` | Cloud deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
@@ -230,7 +261,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `src/util.ts` | Fetch with timeout, untrusted-label sanitising, money and percent formatting, bigint/UI unit conversion. |
 | `src/state.ts` | The single in-memory dashboard state plus `update()`/`setAgent()`. Changes are batched into one WebSocket broadcast every 150 ms. |
 | `src/orchestrator.ts` | The pipeline. Mode changes are queued and applied between scans, so a token checked in paper can never be bought live. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
-| `src/server.ts` | HTTP server for `public/` (with path-traversal guard), the locked-down `/api/setup` wallet connection, and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
+| `src/server.ts` | HTTP server for `public/` (with path-traversal guard), the locked-down `/api/setup` (wallet) and `/api/telegram` (bot token, verified with Telegram before saving) endpoints, and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
 | **src/agents/** | |
 | `src/agents/scanner.ts` | **Scanner.** Computes spikeX/volX from snapshots, applies the flag rule and LP ≥ 85%, and outputs candidate cards. Never trades. |
 | `src/agents/rugCheck.ts` | **Rug check.** Authorities, extensions, LP, dev wallet, holder sell simulation and round-trip tax check. Returns the exact failing reason. |

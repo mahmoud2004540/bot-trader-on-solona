@@ -85,4 +85,5 @@ export async function onClose(mode: Mode, t: ClosedTrade) {
   });
   db.prepare("INSERT INTO equity VALUES (?,?,?,?)").run(Date.now(), bal, state.closes, mode);
   setAgent("equity", "UPDATE", `${usd(bal)} · ${state.closes} closes`);
+  bus.emit("closed", t); // Telegram sends the exit alert with the updated balance
 }

@@ -27,6 +27,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS equity (ts INTEGER, balance REAL, closes INTEGER, mode TEXT);
   CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at INTEGER, start_balance REAL, mode TEXT);
   CREATE TABLE IF NOT EXISTS open_position (id INTEGER PRIMARY KEY CHECK (id = 1), mode TEXT, json TEXT);
+  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 `);
 
 let line = Number((db.prepare("SELECT MAX(line) AS m FROM decisions").get() as { m: number | null }).m ?? 0);
@@ -102,4 +103,12 @@ export function sessionHistory(mode: Mode, since: number) {
   const rows = db.prepare("SELECT * FROM decisions WHERE mode = ? AND ts >= ? ORDER BY line").all(mode, since) as any[];
   const log: LogEntry[] = rows.map((r) => ({ line: r.line, ts: r.ts, kind: r.kind, ticker: r.ticker, detail: r.detail, reason: r.reason, pnlUsd: r.pnl_usd ?? undefined }));
   return { trades, curve, log };
+}
+
+// ---- small key/value settings (Telegram owner, alert preferences) ----
+export const getSetting = (key: string) =>
+  (db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
+export function setSetting(key: string, value: string | null) {
+  if (value === null) db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+  else db.prepare("INSERT OR REPLACE INTO settings VALUES (?, ?)").run(key, value);
 }

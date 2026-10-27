@@ -44,6 +44,11 @@ function useSecret(raw: string, what: string): PublicKey {
 
 export const walletPublicKey = (): PublicKey | null => keypair?.publicKey ?? null;
 
+/** Other secrets (e.g. the Telegram bot token) that must never appear in output either. */
+export function registerSecret(s: string) {
+  if (s) secretFingerprints.push(s);
+}
+
 /** Last line of defence for anything written to disk, console or the dashboard. */
 export function redact(s: string): string {
   let out = s;

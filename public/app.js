@@ -75,6 +75,7 @@ function render() {
   $("paperState").textContent = S.mode === "paper" ? "on" : "off";
   t.querySelector(".seg-live").lastChild.textContent = S.mode === "live" ? "live" : "live off";
   renderWallet();
+  renderTelegram();
   const n = $("notice");
   n.textContent = S.notice ? "· " + S.notice : "";
   n.className = "notice" + (S.mode === "live" ? " live" : "");
@@ -120,6 +121,22 @@ function renderWallet() {
   const f = S.funding;
   $("wbBal").textContent = f ? `◎${f.sol.toFixed(3)} · ${usd(f.usdc)} USDC` : "";
   $("wbWarn").classList.toggle("hidden", !f || f.usdc >= 5 || S.mode !== "live");
+}
+
+function renderTelegram() {
+  const tg = S.telegram;
+  $("tgStepPaste").classList.toggle("hidden", !!S.cloud);
+  $("tgStepCloud").classList.toggle("hidden", !S.cloud);
+  $("tgOpen").classList.toggle("hidden", tg.enabled);
+  const pair = $("tgPair");
+  pair.classList.toggle("hidden", !(tg.enabled && !tg.paired && tg.code && tg.bot));
+  if (tg.enabled && !tg.paired && tg.bot && tg.code) {
+    pair.href = `https://t.me/${encodeURIComponent(tg.bot)}?start=${encodeURIComponent(tg.code)}`;
+    pair.textContent = `tap to pair @${tg.bot} →`;
+  }
+  $("tgBadge").textContent = !tg.enabled ? "OFF" : tg.paired ? "ON" : "PAIR";
+  $("tgLast").textContent = !tg.enabled ? "off" : tg.paired ? `@${tg.bot} · alerts on` : `or send: /start ${tg.code}`;
+  $("tgCard").classList.toggle("active", tg.enabled && !tg.paired);
 }
 
 function renderCandidates() {
@@ -345,6 +362,31 @@ $("setupForm").addEventListener("submit", async (ev) => {
     $("setupForm").classList.add("hidden");
     msg.className = "setup-msg ok";
     msg.textContent = `connected ✓ ${j.address.slice(0, 4)}…${j.address.slice(-4)} · now send USDC or SOL to it (step 4)`;
+  } catch (e) {
+    msg.className = "setup-msg err";
+    msg.textContent = e.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+
+$("tgOpen").addEventListener("click", () => $("tgSetup").classList.remove("hidden"));
+$("tgLater").addEventListener("click", () => $("tgSetup").classList.add("hidden"));
+$("tgForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const input = $("tgToken"), msg = $("tgMsg"), go = $("tgGo");
+  if (!input.value.trim()) return;
+  go.disabled = true;
+  msg.className = "setup-msg";
+  msg.textContent = "checking with Telegram…";
+  try {
+    const r = await fetch("/api/telegram" + location.search, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: input.value }) });
+    const j = await r.json();
+    input.value = "";
+    if (!r.ok) throw new Error(j.error || "failed");
+    msg.className = "setup-msg ok";
+    msg.textContent = `connected ✓ @${j.bot} · now tap "tap to pair" on the Telegram card`;
+    $("tgForm").classList.add("hidden");
   } catch (e) {
     msg.className = "setup-msg err";
     msg.textContent = e.message;

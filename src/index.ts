@@ -10,6 +10,7 @@ import { startServer } from "./server.js";
 import { savePosition } from "./agents/logger.js";
 import { liveBlockedReason, restorePosition, run } from "./orchestrator.js";
 import { conn } from "./data/solana.js";
+import { startTelegram } from "./telegram.js";
 
 async function main() {
   const wallet = DEMO ? null : loadWallet();
@@ -43,6 +44,10 @@ async function main() {
   else await restorePosition();
   console.log(`mode ${state.mode} · start $${state.startBalance.toFixed(2)} · now $${state.balance.toFixed(2)}`);
   startServer();
+  if (CONFIG.telegramToken)
+    startTelegram(CONFIG.telegramToken)
+      .then((bot) => console.log(`telegram @${bot}${state.telegram.paired ? " · paired" : ` · send /start ${state.telegram.code} to pair`}`))
+      .catch(() => console.warn("telegram: TELEGRAM_BOT_TOKEN was rejected by Telegram; alerts are off"));
   await run(DEMO ? simMarket : liveMarket);
 }
 

@@ -57,6 +57,16 @@
     <aside class="panel agents">
       <div class="panel-h"><span>AGENTS</span><span class="muted">· <b id="online">6</b> online</span></div>
       <div id="agentList" class="agent-list"></div>
+      <div id="tgCard" class="agent a-tg">
+        <div class="a-top">
+          <div class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 4L3 11l6 2.5L11 20l3-4.5 5 3.5z"/><path d="M9 13.5L21 4"/></svg></div>
+          <span class="a-name">TELEGRAM</span><span id="tgBadge" class="a-badge">OFF</span>
+        </div>
+        <div id="tgDesc" class="a-desc">alerts + /status /pause on your phone</div>
+        <a id="tgPair" class="tg-pair hidden" target="_blank" rel="noopener">tap to pair in Telegram →</a>
+        <button id="tgOpen" class="tg-btn" type="button">connect Telegram</button>
+        <div id="tgLast" class="a-last">off</div>
+      </div>
     </aside>
 
     <!-- center -->
@@ -199,6 +209,34 @@
     <p class="setup-risk">Use only money you can afford to lose. Memecoins can go to zero in seconds.
       <span class="ar" dir="rtl">استخدم فلوس تقدر تستغنى عنها بس.</span></p>
     <button id="setupLater" class="setup-later" type="button">not now · watch in paper mode</button>
+  </div>
+</div>
+<div id="tgSetup" class="setup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tgTitle">
+  <div class="setup-card">
+    <div class="setup-h">
+      <div class="logo small"><i></i><i></i></div>
+      <div><div id="tgTitle" class="setup-title">Connect Telegram</div><div class="muted setup-sub">alerts on every trade · control from your phone</div></div>
+    </div>
+    <ol class="steps">
+      <li><b>In Telegram, open @BotFather → send /newbot</b> → pick any name, then a username ending in <span class="mono">bot</span>.
+        <div class="ar" dir="rtl">في تليجرام افتح ‎@BotFather‎ وابعت ‎/newbot‎، اختار أي اسم، وبعدين يوزرنيم آخره bot.</div></li>
+      <li><b>Copy the token it sends you</b> (looks like <span class="mono">123456789:AA…</span>).
+        <div class="ar" dir="rtl">انسخ التوكن اللي هيبعتهولك (شكله ‎123456789:AA…‎).</div></li>
+      <li id="tgStepPaste"><b>Paste it here.</b> Saved only on this device.
+        <div class="ar" dir="rtl">الصقه هنا. بيتحفظ على الجهاز ده بس.</div>
+        <form id="tgForm" class="setup-form" autocomplete="off">
+          <input id="tgToken" type="password" placeholder="paste bot token" spellcheck="false" autocomplete="off" />
+          <button type="submit" id="tgGo">Connect</button>
+        </form>
+        <div id="tgMsg" class="setup-msg"></div></li>
+      <li id="tgStepCloud" class="hidden"><b>Railway → this service → Variables → New Variable:</b> name <span class="mono">TELEGRAM_BOT_TOKEN</span>, value = paste → Deploy.
+        <div class="ar" dir="rtl">في Railway: Variables ← New Variable، الاسم TELEGRAM_BOT_TOKEN والقيمة الصق التوكن ← Deploy.</div></li>
+      <li><b>Pair:</b> tap the "tap to pair" link on the Telegram card, then Start. Only your account will control the bot.
+        <div class="ar" dir="rtl">اربط: دوس على "tap to pair" في كارت تليجرام وبعدين Start. حسابك انت بس اللي هيتحكم في البوت.</div></li>
+    </ol>
+    <p class="setup-risk">Never send your wallet key in Telegram. If you do by mistake, the bot deletes it.
+      <span class="ar" dir="rtl">عمرك ما تبعت مفتاح المحفظة في تليجرام.</span></p>
+    <button id="tgLater" class="setup-later" type="button">close</button>
   </div>
 </div>
 <script src="app.js"></script>
