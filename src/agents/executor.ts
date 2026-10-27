@@ -11,8 +11,8 @@ import { CONFIG } from "../config.js";
 import { setAgent, update } from "../state.js";
 import { fromUi, toUi, usd, signedUsd } from "../util.js";
 import { conn, tokenBalance } from "../data/solana.js";
-import { buildSwap, quote as jupQuote } from "../data/jupiter.js";
-import { allowQuoteSpend, allowSolSpend } from "../security/txGuard.js";
+import { buildSwap } from "../data/jupiter.js";
+import { allowQuoteSpend } from "../security/txGuard.js";
 import { signGuarded, walletPublicKey } from "../security/wallet.js";
 import type { Market } from "../data/market.js";
 import type { Candidate, ClosedTrade, Mode, Position, Quote } from "../types.js";
@@ -20,12 +20,11 @@ import type { Candidate, ClosedTrade, Mode, Position, Quote } from "../types.js"
 const E = CONFIG.executor;
 const capPct = E.slippageBps / 100;
 
-async function swapLive(q: Quote, maxQuoteSpend: bigint, maxSolSpend = 0n): Promise<string> {
+async function swapLive(q: Quote, maxQuoteSpend: bigint): Promise<string> {
   const me = walletPublicKey();
   if (!me) throw new Error("live mode without wallet");
   const { tx, lastValidBlockHeight } = await buildSwap(q, me);
   allowQuoteSpend(maxQuoteSpend);
-  allowSolSpend(maxSolSpend);
   const signed = await signGuarded(conn, tx);
   const sig = await conn.sendRawTransaction(signed.serialize(), { maxRetries: 3 });
   const blockhash = signed.message.recentBlockhash;
@@ -136,20 +135,4 @@ function closedTrade(pos: Position, tokens: bigint, proceedsUsd: number, exitSli
   };
   setAgent("executor", "FLAT", `closed ${pos.ticker} ${signedUsd(t.pnlUsd)}`);
   return t;
-}
-
-/**
- * Deposit helper (live only): swap SOL that was sent to the bot wallet into USDC, the
- * currency the bot trades in. Same Jupiter route, same 2% cap, same tx guard; the guard is
- * told exactly how much SOL this one swap may spend. Returns USDC received.
- */
-export async function convertSol(lamports: bigint): Promise<number> {
-  const me = walletPublicKey();
-  if (!me) throw new Error("no wallet");
-  const q = await jupQuote(CONFIG.wsolMint, CONFIG.quoteMint, lamports);
-  if (!q) throw new Error("no Jupiter route SOL→USDC");
-  if (q.priceImpactPct > capPct) throw new Error(`price impact ${q.priceImpactPct.toFixed(1)}% > cap ${capPct}%`);
-  const before = await tokenBalance(me, CONFIG.quoteMint);
-  await swapLive(q, 0n, lamports);
-  return toUi((await tokenBalance(me, CONFIG.quoteMint)) - before, CONFIG.quoteDecimals);
 }

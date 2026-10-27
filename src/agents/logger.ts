@@ -27,7 +27,6 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS equity (ts INTEGER, balance REAL, closes INTEGER, mode TEXT);
   CREATE TABLE IF NOT EXISTS sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, started_at INTEGER, start_balance REAL, mode TEXT);
   CREATE TABLE IF NOT EXISTS open_position (id INTEGER PRIMARY KEY CHECK (id = 1), mode TEXT, json TEXT);
-  CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT);
 `);
 
 let line = Number((db.prepare("SELECT MAX(line) AS m FROM decisions").get() as { m: number | null }).m ?? 0);
@@ -66,7 +65,7 @@ export function logTrade(t: ClosedTrade) {
 // ---- terminal: the same numbered lines, coloured, on stdout ----
 const ANSI = { reset: "\x1b[0m", dim: "\x1b[2m", teal: "\x1b[36m", green: "\x1b[32m", red: "\x1b[31m", orange: "\x1b[33m" };
 function printToTerminal(e: LogEntry) {
-  const c = e.kind === "INFO" ? ANSI.dim : e.kind === "ENTER" ? ANSI.teal : e.kind === "EXIT" ? ((e.pnlUsd ?? 0) >= 0 ? ANSI.green : ANSI.red) : ANSI.red;
+  const c = e.kind === "ENTER" ? ANSI.teal : e.kind === "EXIT" ? ((e.pnlUsd ?? 0) >= 0 ? ANSI.green : ANSI.red) : ANSI.red;
   console.log(
     `${ANSI.dim}#${String(e.line).padStart(4, "0")}  ${hhmmss(e.ts)}${ANSI.reset}  ${c}${e.kind.padEnd(8)}${ANSI.reset}  ${e.ticker.padEnd(11)}  ${c}${e.detail}${ANSI.reset}\n` +
       `       ${ANSI.orange}${e.reason}${ANSI.reset}`,
@@ -88,10 +87,6 @@ export function loadPosition(mode: Mode): Position | null {
 
 export interface SessionRow { id: number; started_at: number; start_balance: number; mode: string }
 export const lastSession = () => db.prepare("SELECT * FROM sessions ORDER BY id DESC LIMIT 1").get() as SessionRow | undefined;
-/** Before the first trade, START follows deposits so the result isn't measured from $0. */
-export function setSessionStartBalance(bal: number) {
-  db.prepare("UPDATE sessions SET start_balance = ? WHERE id = (SELECT MAX(id) FROM sessions)").run(bal);
-}
 export function newSession(mode: Mode, startedAt: number, startBalance: number) {
   db.prepare("INSERT INTO sessions (started_at, start_balance, mode) VALUES (?,?,?)").run(startedAt, startBalance, mode);
 }
@@ -103,12 +98,4 @@ export function sessionHistory(mode: Mode, since: number) {
   const rows = db.prepare("SELECT * FROM decisions WHERE mode = ? AND ts >= ? ORDER BY line").all(mode, since) as any[];
   const log: LogEntry[] = rows.map((r) => ({ line: r.line, ts: r.ts, kind: r.kind, ticker: r.ticker, detail: r.detail, reason: r.reason, pnlUsd: r.pnl_usd ?? undefined }));
   return { trades, curve, log };
-}
-
-// ---- small key/value settings (Telegram owner, alert preferences) ----
-export const getSetting = (key: string) =>
-  (db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
-export function setSetting(key: string, value: string | null) {
-  if (value === null) db.prepare("DELETE FROM settings WHERE key = ?").run(key);
-  else db.prepare("INSERT OR REPLACE INTO settings VALUES (?, ?)").run(key, value);
 }

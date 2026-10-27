@@ -7,9 +7,8 @@
 //      SPL Token (SyncNative, or CloseAccount paying rent back to US only).
 //      Any System/Token transfer to another address => rejected.
 //   3. The transaction is simulated and the wallet's SOL and USDC balances after the
-//      simulation are compared with before: SOL may only drop by fees/rent (plus the
-//      declared amount for a SOL→USDC conversion), USDC may only drop by at most the
-//      amount we intended to swap in.
+//      simulation are compared with before: SOL may only drop by fees/rent, USDC may
+//      only drop by at most the amount we intended to swap in.
 // If any check fails, the transaction is never signed.
 import { Connection, PublicKey, VersionedTransaction, AddressLookupTableAccount } from "@solana/web3.js";
 import { CONFIG } from "../config.js";
@@ -33,20 +32,14 @@ export function ataAddress(owner: PublicKey, mint: PublicKey, tokenProgram = PRO
 }
 
 let pendingSpend = 0n;
-let pendingLamports = 0n;
 /** Executor declares how much USDC (raw units) the next transaction is allowed to spend. */
 export function allowQuoteSpend(raw: bigint) {
   pendingSpend = raw;
 }
-/** Funding agent declares how much SOL a SOL→USDC conversion swap may spend (on top of fees). */
-export function allowSolSpend(lamports: bigint) {
-  pendingLamports = lamports;
-}
 
 export async function assertSwapOnly(conn: Connection, tx: VersionedTransaction, wallet: PublicKey) {
   const maxQuoteSpend = pendingSpend;
-  const maxSolSpend = MAX_SOL_SPEND_LAMPORTS + pendingLamports;
-  pendingSpend = pendingLamports = 0n;
+  pendingSpend = 0n;
   const msg = tx.message;
   const luts: AddressLookupTableAccount[] = [];
   for (const l of msg.addressTableLookups) {
@@ -107,6 +100,6 @@ export async function assertSwapOnly(conn: Connection, tx: VersionedTransaction,
   const [w, u] = sim.value.accounts ?? [];
   const postLamports = BigInt(w?.lamports ?? 0);
   const postUsdc = u?.data?.[0] ? Buffer.from(u.data[0], "base64").readBigUInt64LE(64) : 0n;
-  if (preLamports - postLamports > maxSolSpend) throw new Error("txGuard: SOL outflow exceeds fee budget");
+  if (preLamports - postLamports > MAX_SOL_SPEND_LAMPORTS) throw new Error("txGuard: SOL outflow exceeds fee budget");
   if (preUsdc - postUsdc > maxQuoteSpend) throw new Error("txGuard: USDC outflow exceeds intended swap amount");
 }

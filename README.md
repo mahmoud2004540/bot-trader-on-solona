@@ -13,131 +13,7 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
-## Telegram: alerts and control from your phone
-
-Telegram is the remote control; the bot itself still runs on your computer, Android phone (Termux)
-or server.
-
-1. In Telegram open **@BotFather**, send `/newbot`, pick a name and a username ending in `bot`, and copy the token.
-2. Dashboard → **TELEGRAM** card → **connect Telegram** → paste the token. In the cloud, add
-   `TELEGRAM_BOT_TOKEN` in the Variables instead.
-3. Tap **tap to pair** on the card, then press **Start** in Telegram. Only that Telegram account
-   controls the bot from now on.
-
-You get a message on every **ENTER** and **EXIT** (with the reason, PnL and new balance), on every SOL
-conversion, and if an exit keeps failing. Commands: `/status`, `/report`, `/log`, `/pause`,
-`/resume`, `/paper`, `/live` (asks for `/live yes`), `/filtered on|off`.
-
-Safety:
-- pairing uses a one-time code shown only on the dashboard; every other chat is ignored silently;
-- the wallet key is never accepted over Telegram, and a message that looks like one is deleted
-  immediately;
-- messages are plain text (no Markdown/HTML), so token names can't inject links;
-- the bot token is kept out of every log and error.
-
-### تليجرام (بالعربي)
-1. في تليجرام افتح **‎@BotFather‎** وابعت ‎/newbot‎، اختار اسم ويوزرنيم آخره bot، وانسخ التوكن.
-2. في الداشبورد: كارت **TELEGRAM** ← **connect Telegram** ← الصق التوكن.
-3. دوس **tap to pair** وبعدين **Start** في تليجرام.
-
-هيوصلك رسالة مع كل شراء وبيع. الأوامر: ‎/status‎ و‎/report‎ و‎/pause‎ و‎/resume‎ و‎/live‎ و‎/paper‎.
-**عمرك ما تبعت مفتاح المحفظة في تليجرام.** لو بعته بالغلط، البوت بيمسحه.
-
-## Phone only and free: Android + Termux
-
-On an **Android** phone the bot can run on the phone itself, for free (iPhone can't do this).
-Keep the phone **charging and on Wi-Fi** all night.
-
-1. Install **Termux** from F-Droid (f-droid.org). The Play Store version is outdated.
-2. Open Termux and paste this once:
-   ```
-   pkg update -y && pkg install -y nodejs-lts git && git clone --depth 1 -b claude/grok-bot-terminal-solana-fbkj8n https://github.com/mahmoud2004540/bot-trader-on-solona grok && cd grok && bash start.sh
-   ```
-   It installs everything, opens the dashboard in the phone's browser (`http://127.0.0.1:8787`) and
-   takes a wake lock so Android doesn't pause it.
-3. Connect Phantom with the card in the dashboard, exactly as on a computer: paste the Grok Bot
-   account's key and send USDC/SOL to it.
-4. Android settings → Apps → Termux → Battery → **Unrestricted** (otherwise Android may kill it at night).
-
-Next time just open Termux and run `cd grok && bash start.sh`. To stop it, press Ctrl+C in Termux.
-
-### أندرويد ببلاش (بالعربي)
-1. نزّل **Termux** من F-Droid (موقع f-droid.org). نسخة جوجل بلاي قديمة.
-2. افتح Termux والصق السطر اللي فوق مرة واحدة. هيسطّب كل حاجة ويفتح الداشبورد في متصفح التليفون.
-3. اربط فانتوم من الكارت اللي في الداشبورد، وابعت USDC أو SOL لحساب Grok Bot.
-4. الإعدادات ← التطبيقات ← Termux ← البطارية ← **Unrestricted** (غير مقيّد).
-5. خلّي التليفون على الشاحن وعلى الواي فاي طول الليل.
-
-المرة الجاية: افتح Termux واكتب `cd grok && bash start.sh`.
-
-## Phone only, no computer: run it in the cloud (Railway)
-
-The bot can't run on a phone overnight, because the phone sleeps and closes the app. Instead it runs
-24/7 on a small cloud server, and you set it up and watch it from the phone's browser. The repo is
-ready for Railway (`railway.json`: start `npm start`, **1 replica** so two copies never trade the
-same wallet, always restart).
-
-1. On railway.com sign in with GitHub → **New Project → Deploy from GitHub repo** → pick this repo.
-   In the service's **Settings → Source → Branch**, choose `claude/grok-bot-terminal-solana-fbkj8n`.
-2. **Add a Volume** to the service with mount path `/data`. This is required for live trading:
-   the open position, the log and the database survive restarts and redeploys there.
-3. **Variables** → add:
-   - `DASHBOARD_TOKEN` = a long password of your choice (the dashboard is on the internet),
-   - `SOLANA_PRIVATE_KEY` = the private key of a new Phantom account called "Grok Bot".
-4. **Settings → Networking → Generate Domain**, then open `https://<that-domain>/?token=<your password>`
-   on the phone and bookmark it.
-5. In Phantom, send USDC or SOL to the Grok Bot account, keeping at least 0.05 SOL in it for fees.
-
-In the cloud the bot binds `0.0.0.0`, the dashboard requires the token from every device, the
-paste-the-key card is disabled (the key comes only from the Variables), and live mode stays off until
-a volume is attached. Railway is a paid service (a few dollars a month); check their current pricing.
-
-### من التليفون بس (بالعربي)
-
-البوت ما ينفعش يشتغل على التليفون طول الليل، لأن التليفون بينام وبيقفل الأبلكيشن. الحل إنه يشتغل على
-سيرفر صغير في Railway على طول، وانت تجهّزه وتتابعه من متصفح التليفون:
-
-1. railway.com ← سجّل دخول بـ GitHub ← New Project ← Deploy from GitHub repo ← اختار الريبو ده.
-   من Settings ← Source ← Branch اختار `claude/grok-bot-terminal-solana-fbkj8n`.
-2. ضيف **Volume** للخدمة، والـ mount path يكون `/data`. ده لازم عشان LIVE.
-3. Variables ← ضيف `DASHBOARD_TOKEN` (كلمة سر طويلة) و`SOLANA_PRIVATE_KEY` (مفتاح حساب Grok Bot من فانتوم).
-4. Settings ← Networking ← Generate Domain، وافتح `https://الدومين/?token=كلمة-السر` واعمله bookmark.
-5. من فانتوم ابعت USDC أو SOL لحساب Grok Bot، وخلّي فيه 0.05 SOL على الأقل للرسوم.
-
-## Zero-setup start (with Phantom)
-
-1. Install **Node.js 22+** from nodejs.org (once).
-2. Double-click **`Start Grok Bot.command`** (Mac) or **`Start Grok Bot.bat`** (Windows); on Linux run `./start.sh`.
-   It installs everything the first time, opens the dashboard and keeps running all night (auto-restart, computer kept awake).
-3. The dashboard shows a **Connect Phantom** card:
-   - in Phantom create a new account called **Grok Bot**,
-   - Settings → Manage Accounts → Grok Bot → **Show Private Key**, then copy it and paste it into the card,
-   - from your main Phantom account send **USDC or SOL** to Grok Bot, keeping at least 0.05 SOL in it for fees.
-
-That's it. The bot switches to LIVE by itself, waits until the money arrives, converts extra SOL to
-USDC, and starts trading. Every later start goes straight to live with no questions. You see the bot's
-balance in Phantom, and you **withdraw from Phantom** whenever you want; the bot itself never sends
-money anywhere.
-
-> Why not sign with Phantom directly? Phantom shows an approval pop-up for every transaction, so it
-> can't trade while you sleep. A separate Phantom account gives the bot its own key and keeps your
-> main wallet out of reach.
-
-### تشغيل سريع (بالعربي)
-
-1. نزّل **Node.js 22** أو أحدث من nodejs.org (مرة واحدة بس).
-2. دوس مرتين على **`Start Grok Bot.command`** (ماك) أو **`Start Grok Bot.bat`** (ويندوز).
-   هيسطّب كل حاجة أول مرة، ويفتح الداشبورد، ويفضل شغال طول الليل.
-3. في الداشبورد هتلاقي كارت **Connect Phantom**:
-   - في فانتوم اعمل حساب جديد اسمه **Grok Bot**،
-   - Settings ← Manage Accounts ← Grok Bot ← **Show Private Key**، انسخه والصقه في الكارت،
-   - من حسابك الأساسي في فانتوم ابعت **USDC أو SOL** لحساب Grok Bot، وخلّي فيه 0.05 SOL على الأقل للرسوم.
-
-خلاص كده. البوت بيتحول لـ LIVE لوحده، وبيستنى لحد ما الفلوس توصل، وبعدين يبدأ يتداول. تقدر تشوف
-الرصيد وتسحب من فانتوم في أي وقت، والبوت نفسه عمره ما بيبعت فلوس لأي حد.
-**استخدم فلوس تقدر تستغنى عنها بس.**
-
-## Quick start (manual)
+## Quick start
 
 ```bash
 npm install
@@ -165,7 +41,7 @@ is in SQLite, so a restart at 3am:
 - **keeps the line numbers in `night.log`.**
 
 Stray API errors are logged and skipped and do not stop the loop. Every decision is also printed,
-coloured, to the terminal. Keep the machine from sleeping (macOS: `caffeinate -i npm run night`).
+coloured, to the terminal. While `npm run night` runs, it also keeps the computer from going to sleep.
 
 Requires Node ≥ 22.13 (uses the built-in `node:sqlite`, so nothing native to compile).
 
@@ -221,24 +97,14 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 
   There is no transfer or withdraw code anywhere. These checks were run against a real Jupiter swap
   transaction (allowed), a USDC overspend (blocked) and a SOL transfer to a foreign address (blocked).
-- **One-time wallet setup from the dashboard** (`POST /api/setup`) works only from this computer
-  (loopback address and a localhost Host header, so DNS rebinding can't reach it). It is same-origin
-  and JSON-only, so other websites can't trigger it. It only works while no wallet is connected, so a
-  connected key can't be replaced. The pasted key is written to `.env` (mode 600) as
-  `SOLANA_PRIVATE_KEY`, the same env var the bot reads on every start. It is never sent back, logged or
-  stored anywhere else, and the page clears the field immediately.
-- **Deposited SOL is converted with a normal Jupiter swap** inside the bot's own wallet. The guard is
-  told the exact SOL amount for that one swap; an undeclared or reused amount is blocked.
 - **Token metadata is untrusted.** Names and symbols are reduced to short alphanumeric labels
   (`untrustedLabel`). Descriptions, websites and socials are never fetched or read. The dashboard
   inserts every data value with `textContent`, never `innerHTML`.
-- **The dashboard binds to `127.0.0.1`.** To watch it from your phone on the home Wi-Fi, add
-  `HOST=0.0.0.0` **and** `DASHBOARD_TOKEN=<a long password>` to `.env`, then open
-  `http://<pc-ip>:8787/?token=<password>` on the phone. The computer itself never needs the token;
-  every other device does, because the live/paper toggle is on that page. The token guards the
-  WebSocket, which carries all live data and the toggle; the page's static HTML/CSS/JS hold no data.
-  Wallet setup stays computer-only. Requests relayed by a proxy (`X-Forwarded-For`) are never
-  treated as local.
+- **The dashboard binds to `127.0.0.1`.** To watch it from your phone on the same Wi-Fi, set
+  `HOST=0.0.0.0` **and** `DASHBOARD_TOKEN=<a long password>`, then open
+  `http://<pc-ip>:8787/?token=<password>`. The computer itself never needs the token; every other
+  device does, because the live/paper toggle is on that page. The token guards the WebSocket, which
+  carries all live data and the toggle; the static HTML/CSS/JS hold no data.
 
 ## Every file explained
 
@@ -249,19 +115,14 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `.env.example` | Every setting, documented. Copy it to `.env`. |
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
-| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit / termux-wake-lock on Android). |
-| `src/telegram.ts` | Telegram remote control: pairing with a dashboard code, owner-only commands (`/status /report /log /pause /resume /paper /live /filtered`), ENTER/EXIT/warning alerts, deletes anything that looks like a private key, plain-text messages only. |
-| `src/funding.ts` | Wallet watcher (live only). Shows SOL/USDC on the dashboard, holds trading quietly until there is at least $5 USDC, converts deposited SOL to USDC (keeping 0.05 SOL for fees), and moves START to the deposited amount before the first trade. |
-| `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). `start.sh` also runs on Android in Termux: it installs Node with `pkg` and opens the dashboard with `termux-open-url`. They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
-| `railway.json` / `.nvmrc` | Cloud deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
-| `.gitattributes` | Keeps Windows line endings for the `.bat` and Unix line endings for the shell launchers. |
+| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer awake (caffeinate / SetThreadExecutionState / systemd-inhibit). |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |
 | `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. |
 | `src/types.ts` | Shared data shapes: `PairSnapshot`, `Candidate`, `MintFacts`, `RugResult`, `Quote`, `Position`, `ClosedTrade`, `LogEntry`. |
 | `src/util.ts` | Fetch with timeout, untrusted-label sanitising, money and percent formatting, bigint/UI unit conversion. |
 | `src/state.ts` | The single in-memory dashboard state plus `update()`/`setAgent()`. Changes are batched into one WebSocket broadcast every 150 ms. |
-| `src/orchestrator.ts` | The pipeline. Mode changes are queued and applied between scans, so a token checked in paper can never be bought live. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
-| `src/server.ts` | HTTP server for `public/` (with path-traversal guard), the locked-down `/api/setup` (wallet) and `/api/telegram` (bot token, verified with Telegram before saving) endpoints, and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
+| `src/orchestrator.ts` | The pipeline. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Mode switches are refused while a position is open, and are queued and applied between scans, so a token checked in paper can never be bought live. |
+| `src/server.ts` | HTTP server for `public/` (with path-traversal guard) and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional `DASHBOARD_TOKEN` for other devices. |
 | **src/agents/** | |
 | `src/agents/scanner.ts` | **Scanner.** Computes spikeX/volX from snapshots, applies the flag rule and LP ≥ 85%, and outputs candidate cards. Never trades. |
 | `src/agents/rugCheck.ts` | **Rug check.** Authorities, extensions, LP, dev wallet, holder sell simulation and round-trip tax check. Returns the exact failing reason. |

@@ -12,15 +12,6 @@ export interface DashState {
   mode: Mode;
   liveAvailable: boolean;
   wallet: string | null;
-  /** true when no wallet is connected yet: the dashboard shows the Phantom setup card. */
-  needsSetup: boolean;
-  /** running on a cloud host: setup is done in the host's Variables, not by pasting here */
-  cloud: boolean;
-  /** /pause from Telegram or the dashboard: no new entries; an open position is still managed. */
-  paused: boolean;
-  telegram: { enabled: boolean; paired: boolean; bot: string | null; code: string | null };
-  /** what's in the bot wallet right now (live only), refreshed every ~30s while flat. */
-  funding: { sol: number; usdc: number; at: number } | null;
   notice: string;
   startedAt: number;
   startBalance: number;
@@ -53,11 +44,6 @@ export const state: DashState = {
   mode: "live",
   liveAvailable: false,
   wallet: null,
-  needsSetup: false,
-  cloud: false,
-  paused: false,
-  telegram: { enabled: false, paired: false, bot: null, code: null },
-  funding: null,
   notice: "",
   startedAt: Date.now(),
   startBalance: 0,

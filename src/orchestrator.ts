@@ -1,7 +1,7 @@
 // Wires the six agents into one pipeline:  SCAN → CHECK → SIZE → EXEC → LOG → EQUITY.
 // One position at a time: while a position is open the loop only monitors it.
-import { CLOUD, CONFIG } from "./config.js";
-import { bus, state, update, setAgent } from "./state.js";
+import { CONFIG } from "./config.js";
+import { state, update, setAgent } from "./state.js";
 import { redact, walletPublicKey } from "./security/wallet.js";
 import { scan } from "./agents/scanner.js";
 import { rugCheck } from "./agents/rugCheck.js";
@@ -11,23 +11,12 @@ import { loadPosition, logDecision, logTrade, savePosition } from "./agents/logg
 import * as equity from "./agents/equity.js";
 import { signedUsd, usd } from "./util.js";
 import { tokenBalance } from "./data/solana.js";
-import { fundingTick } from "./funding.js";
 import type { Market } from "./data/market.js";
 import type { Mode } from "./types.js";
 
 const seen = new Map<string, number>(); // mint -> last time we decided on it
 const recentlyDecided = (mint: string) => Date.now() - (seen.get(mint) ?? 0) < CONFIG.recheckFilteredAfterMs;
 let busy = false; // true while a swap is in flight; blocks mode switches
-
-/** Cloud without a volume: a redeploy would wipe the saved open position, so no live trading. */
-export const liveBlockedReason = () =>
-  CLOUD && !CONFIG.cloudVolume ? "attach a Volume to the service (mount path /data) to go live" : null;
-
-export function setPaused(paused: boolean) {
-  update((s) => (s.paused = paused));
-  setAgent("scanner", paused ? "PAUSED" : "SCAN", paused ? "paused · no new entries" : "resumed", false);
-  wake?.();
-}
 
 // Mode changes are queued and applied by the loop between scans, never in the middle of one,
 // so a token checked and sized in paper can't end up bought with real money (and vice versa).
@@ -39,20 +28,12 @@ const nap = (ms: number) =>
     wake = () => (clearTimeout(t), r());
   });
 
-/** Called right after the wallet is connected from the dashboard: go live as soon as we're flat. */
-export function goLiveWhenFlat() {
-  pendingMode = "live";
-  if (state.position) update((s) => (s.notice = "wallet connected · goes LIVE after the open paper position closes"));
-  wake?.();
-}
-
 export function setMode(mode: Mode): string | null {
   if (mode === state.mode && !pendingMode) return null;
   if (state.position || busy) return "close the open position before switching mode";
-  if (mode === "live" && !walletPublicKey()) return "connect your Phantom wallet first (setup card)";
-  if (mode === "live" && liveBlockedReason()) return liveBlockedReason();
+  if (mode === "live" && !walletPublicKey()) return "live needs SOLANA_PRIVATE_KEY in .env";
   pendingMode = mode;
-  wake?.();
+  wake?.(); // apply within a moment instead of after the 20 s scan pause
   return null;
 }
 
@@ -67,8 +48,6 @@ async function applyPendingMode() {
   });
   await equity.startSession(mode, { resume: false });
 }
-
-let lastExitAlert = 0;
 
 async function manageOpenPosition(market: Market) {
   const pos = state.position!;
@@ -90,10 +69,6 @@ async function manageOpenPosition(market: Market) {
   } catch (e) {
     // Stay in the position and retry with a fresh quote next tick (cap stays 2%).
     setAgent("executor", "LONG", `exit retry · ${redact((e as Error).message).slice(0, 50)}`);
-    if (Date.now() - lastExitAlert > 10 * 60_000) {
-      lastExitAlert = Date.now();
-      bus.emit("alert", `⚠️ can't exit ${pos.ticker} yet (${redact((e as Error).message).slice(0, 80)}). Retrying every few seconds.`);
-    }
   } finally {
     busy = false;
   }
@@ -179,8 +154,7 @@ export async function run(market: Market) {
       if (state.position) await manageOpenPosition(market);
       else {
         await applyPendingMode();
-        if ((await fundingTick()) && !state.paused) await hunt(market);
-        else if (state.paused) setAgent("scanner", "PAUSED", "paused · /resume to trade again", false);
+        await hunt(market);
       }
     } catch (e) {
       console.error("[loop]", redact(String((e as Error)?.message ?? e)));

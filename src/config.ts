@@ -6,15 +6,6 @@ const env = (k: string, d = "") => process.env[k]?.trim() || d;
 
 export const DEMO = process.argv.includes("--demo");
 
-/**
- * Running on a cloud host (Railway sets RAILWAY_*; CLOUD=1 for any other host).
- * Then the dashboard is on the public internet: it binds 0.0.0.0, requires DASHBOARD_TOKEN,
- * the wallet key comes from the host's Variables, and data lives on the attached volume.
- */
-export const CLOUD = Boolean(process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_ENVIRONMENT_ID || process.env.CLOUD === "1");
-/** Persistent disk on the host. Without one, a redeploy would forget an open position. */
-const VOLUME = process.env.RAILWAY_VOLUME_MOUNT_PATH?.trim() || (process.env.CLOUD === "1" ? process.env.DATA_DIR?.trim() : "") || "";
-
 export const CONFIG = {
   // ---- runtime ----
   mode: (env("MODE", "live") === "paper" ? "paper" : "live") as "live" | "paper",
@@ -22,14 +13,10 @@ export const CONFIG = {
   jupiterBase: env("JUPITER_BASE_URL", "https://lite-api.jup.ag/swap/v1"),
   jupiterApiKey: env("JUPITER_API_KEY"),
   birdeyeApiKey: env("BIRDEYE_API_KEY"),
-  host: env("HOST", CLOUD ? "0.0.0.0" : "127.0.0.1"),
+  host: env("HOST", "127.0.0.1"),
   port: Number(env("PORT", "8787")),
   dashboardToken: env("DASHBOARD_TOKEN"),
-  telegramToken: env("TELEGRAM_BOT_TOKEN"),
-  telegramApi: env("TELEGRAM_API_BASE", "https://api.telegram.org"),
-  dataDir: env("DATA_DIR", VOLUME || (DEMO ? "data/demo" : "data")),
-  /** live trading in the cloud needs a persistent volume (see VOLUME above) */
-  cloudVolume: Boolean(VOLUME),
+  dataDir: env("DATA_DIR", DEMO ? "data/demo" : "data"),
   paperStartUsd: Number(env("PAPER_START_USD", "100")),
 
   // Equity is held in USDC; every trade is USDC -> token -> USDC.
