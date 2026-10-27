@@ -5,7 +5,8 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
-    "demo": "tsx src/index.ts --demo",
+    "night": "tsx src/night.ts",
+    "demo": "tsx src/index.ts --demo --new-session",
     "typecheck": "tsc --noEmit"
   },
   "repository": {

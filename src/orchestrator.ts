@@ -7,9 +7,10 @@ import { scan } from "./agents/scanner.js";
 import { rugCheck } from "./agents/rugCheck.js";
 import { size } from "./agents/sizer.js";
 import * as executor from "./agents/executor.js";
-import { logDecision, logTrade } from "./agents/logger.js";
+import { loadPosition, logDecision, logTrade, savePosition } from "./agents/logger.js";
 import * as equity from "./agents/equity.js";
 import { signedUsd, sleep, usd } from "./util.js";
+import { tokenBalance } from "./data/solana.js";
 import type { Market } from "./data/market.js";
 import type { Mode } from "./types.js";
 
@@ -25,7 +26,7 @@ export function setMode(mode: Mode): string | null {
     s.mode = mode;
     s.notice = mode === "live" ? "LIVE · real funds" : "paper · simulated fills";
   });
-  void equity.resetSession(mode);
+  void equity.startSession(mode, { resume: false });
   return null;
 }
 
@@ -37,6 +38,7 @@ async function manageOpenPosition(market: Market) {
   try {
     const t = await executor.close(market, state.mode, pos, exitReason);
     logTrade(t);
+    savePosition(state.mode, null);
     logDecision("EXIT", t.ticker, t.mint, signedUsd(t.pnlUsd), exitReason, t.pnlUsd);
     update((s) => {
       s.position = null;
@@ -87,6 +89,7 @@ async function hunt(market: Market) {
         setAgent("executor", "FLAT", `skipped ${c.ticker} · ${res.error}`);
         continue;
       }
+      savePosition(state.mode, res); // persisted first: a crash now must not orphan the bag
       logDecision("ENTER", c.ticker, c.mint, `${sizePct.toFixed(0)}% · ${usd(sizeUsd)}`, entryReason);
       update((s) => {
         s.position = res;
@@ -103,6 +106,27 @@ async function hunt(market: Market) {
     }
   }
   if (!state.position) setAgent("executor", "FLAT", state.agents.executor.last, false);
+}
+
+/** After a restart: pick the saved position back up (in live mode only if the tokens are still in the wallet). */
+export async function restorePosition() {
+  const pos = loadPosition(state.mode);
+  if (!pos) return;
+  if (state.mode === "live") {
+    const me = walletPublicKey();
+    const held = me ? await tokenBalance(me, pos.mint) : 0n;
+    if (held === 0n) {
+      console.warn(`saved position ${pos.ticker} no longer in wallet; clearing it`);
+      return savePosition(state.mode, null);
+    }
+    pos.tokens = held;
+  }
+  update((s) => {
+    s.position = pos;
+    s.flow = { ticker: pos.ticker, stage: "exec", filteredReason: null };
+  });
+  setAgent("executor", "LONG", `resumed ${pos.ticker} · ${usd(pos.costUsd)}`);
+  console.log(`resumed open position ${pos.ticker} (${usd(pos.costUsd)} in)`);
 }
 
 export async function run(market: Market) {

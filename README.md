@@ -18,13 +18,30 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 ```bash
 npm install
 cp .env.example .env        # set SOLANA_PRIVATE_KEY and ideally a paid SOLANA_RPC_URL
-npm start                   # LIVE: http://127.0.0.1:8787
+npm run night               # LIVE, overnight: auto-restarts and resumes → http://127.0.0.1:8787
+npm start                   # LIVE, single run (resumes tonight's session if one exists)
+npm start -- --new-session  # force a fresh START balance / counters
 npm run demo                # synthetic market, paper only, no wallet / no network needed
 npm run typecheck
 ```
 
 Fund the wallet with **USDC** (the trading balance) plus about **0.05 SOL** for fees. Equity, sizing
 and PnL are all in USDC. If no key is set, the bot starts in paper mode and says so in the header.
+
+### Running overnight
+
+`npm run night` is the way to run it while you sleep. It launches the bot and restarts it
+with backoff (5 s → 60 s) if the bot process dies for any reason. Everything needed to carry on
+is in SQLite, so a restart at 3am:
+
+- **resumes the open position:** it is saved *before* the ENTER is logged; in live mode it is only
+  restored if the tokens are still in the wallet;
+- **keeps the session:** START balance and time, trades/wins/losses, the equity curve and the full
+  log feed all carry over. A session resumes if it started less than 16 h ago in the same mode;
+- **keeps the line numbers in `night.log`.**
+
+Stray API errors are logged and skipped and do not stop the loop. Every decision is also printed,
+coloured, to the terminal. Keep the machine from sleeping (macOS: `caffeinate -i npm run night`).
 
 Requires Node ≥ 22.13 (uses the built-in `node:sqlite`, so nothing native to compile).
 
@@ -45,7 +62,9 @@ token's first sighting, the earlier window is estimated as `(h1 − m5) / 11`.
 `volX` = current 5 m volume ÷ the 6 h average per 5 m (`h6 / 72`).
 
 **Honeypot test.** A true sell simulation needs a wallet that holds the token, so the rug check:
-1. finds real holders (on-curve wallets with SOL for fees),
+1. finds real holders (on-curve wallets with SOL for fees). The candidates come from
+   `getTokenLargestAccounts`; the free public RPC blocks that call, so it falls back to
+   rugcheck's top-holder list. Each holder's balance is re-read on-chain either way,
 2. asks Jupiter to build a sell transaction for them,
 3. runs it through `simulateTransaction` without signature verification.
 
@@ -94,35 +113,36 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `.env.example` | Every setting, documented. Copy it to `.env`. |
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
+| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits; the first launch starts a new session, restarts resume it. |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |
 | `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. |
 | `src/types.ts` | Shared data shapes: `PairSnapshot`, `Candidate`, `MintFacts`, `RugResult`, `Quote`, `Position`, `ClosedTrade`, `LogEntry`. |
 | `src/util.ts` | Fetch with timeout, untrusted-label sanitising, money and percent formatting, bigint/UI unit conversion. |
 | `src/state.ts` | The single in-memory dashboard state plus `update()`/`setAgent()`. Changes are batched into one WebSocket broadcast every 150 ms. |
-| `src/orchestrator.ts` | The pipeline. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
-| `src/server.ts` | HTTP server for `public/` (with path-traversal guard), WebSocket `/ws` for state pushes and the `setMode` toggle, and the optional token check. |
+| `src/orchestrator.ts` | The pipeline. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
+| `src/server.ts` | HTTP server for `public/` (with path-traversal guard) and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
 | **src/agents/** | |
 | `src/agents/scanner.ts` | **Scanner.** Computes spikeX/volX from snapshots, applies the flag rule and LP ≥ 85%, and outputs candidate cards. Never trades. |
 | `src/agents/rugCheck.ts` | **Rug check.** Authorities, extensions, LP, dev wallet, holder sell simulation and round-trip tax check. Returns the exact failing reason. |
 | `src/agents/sizer.ts` | **Sizer.** 25–40% of current equity, scaled by spike and dev-wallet strength. |
 | `src/agents/executor.ts` | **Executor.** Buys and sells through Jupiter, measures actual slippage from balance deltas, and marks the position with a live sell quote. Stop −12% / TP 3R. If a swap's confirmation times out but the swap landed, it still tracks the position. |
-| `src/agents/logger.ts` | **Logger.** SQLite tables `decisions`, `trades`, `equity` plus numbered `night.log`. Refuses reasonless entries. |
-| `src/agents/equity.ts` | **Equity.** Balance (on-chain USDC in live, ledger in paper), equity curve, closes / wins / losses. |
+| `src/agents/logger.ts` | **Logger.** SQLite tables `decisions`, `trades`, `equity`, `sessions`, `open_position` plus numbered `night.log` and coloured terminal output. Refuses reasonless entries. Also saves and loads the open position and session history used for crash recovery. |
+| `src/agents/equity.ts` | **Equity.** Balance (on-chain USDC in live, ledger in paper), equity curve, closes / wins / losses. Starts the session, or resumes it after a restart. |
 | **src/data/** | |
 | `src/data/market.ts` | The `Market` interface agents use, and `liveMarket`, which wires the real sources together. |
 | `src/data/dexscreener.ts` | New Solana tokens from DexScreener's latest profiles and boosts, plus per-pair m5/h1/h6 volume and liquidity. |
 | `src/data/birdeye.ts` | Optional (`BIRDEYE_API_KEY`): new listings and holder counts. |
-| `src/data/rugcheck.ts` | rugcheck.xyz report: LP lock %, creator address, holder count. Cached for 60 s. Authorities are **not** taken from here. |
+| `src/data/rugcheck.ts` | rugcheck.xyz report: LP lock %, creator address, holder count, top holders (fallback for the sell simulation). Cached for 60 s. Authorities are **not** taken from here. |
 | `src/data/solana.ts` | RPC reads: mint authorities and Token-2022 extensions, token balances, and real holder wallets for the honeypot test. |
 | `src/data/jupiter.ts` | Quotes (2% slippage, response validated against the request, no platform fee), swap-transaction building (no fee account, no custom destination), and holder sell simulation. |
-| `src/data/sim.ts` | Synthetic market for `npm run demo`: random tokens, some deliberately rugged, plus a random-walk price. Paper only. |
+| `src/data/sim.ts` | Synthetic market for `npm run demo`: random tokens, some deliberately rugged, plus a random-walk price. Paper only; uses its own `data/demo/` so it never mixes with real sessions. |
 | **src/security/** | |
 | `src/security/wallet.ts` | The only holder of the private key. Exposes the public key, `redact()` and `signGuarded()`. |
 | `src/security/txGuard.ts` | Pre-sign inspection: program allowlist, destination checks and simulated balance-delta limits. |
 | **public/** | |
 | `public/index.html` | Dashboard markup: window bar + toggle, header stats, agent sidebar, live flow graph, stat cards, trade card, log tail, result, log feed. |
 | `public/styles.css` | Near-black theme, one neon colour per agent, monospace numbers, glow and animations, responsive breakpoints at 1200 px and 820 px (phone). |
-| `public/app.js` | WebSocket client that renders each state snapshot, runs the uptime timer and the paper/live toggle (asks for confirmation before going live), and auto-reconnects. |
+| `public/app.js` | WebSocket client that renders each state snapshot, appends tail/feed rows incrementally (feed = every decision of the session, oldest first, newest highlighted), runs the uptime timer and the paper/live toggle (asks for confirmation before going live), and auto-reconnects. |
 
 ## Data written
 

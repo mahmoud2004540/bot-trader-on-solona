@@ -51,7 +51,6 @@ for (const [id, name, desc, rule] of [...AGENTS, ["you", "YOU", "reads the log i
 }
 
 let S = null;
-let lastLogLen = -1;
 let lastEvent = "";
 const seenCands = new Set();
 
@@ -104,11 +103,6 @@ function render() {
   $("stEquity").className = "stat-v mono " + (lc ? (lc.pnlUsd >= 0 ? "green" : "red") : "");
 
   renderTrade();
-  if (S.log.length !== lastLogLen || (S.log.length && S.log[S.log.length - 1].line !== renderTail.lastLine)) {
-    lastLogLen = S.log.length;
-    renderTail();
-    renderFeed();
-  }
   renderResult();
 }
 
@@ -199,48 +193,67 @@ function renderTrade() {
   $("tReason").style.whiteSpace = "pre-line";
 }
 
-function renderTail() {
-  const box = $("tail");
-  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 30;
-  box.replaceChildren();
-  for (const e of S.log) {
-    const win = e.kind === "EXIT" && (e.pnlUsd ?? 0) >= 0;
-    const ln = el("div", `tl ${e.kind}${e.kind === "EXIT" ? (win ? " win" : " loss") : ""}`);
-    ln.append(
-      el("span", "ln", `#${String(e.line).padStart(4, "0")} `),
-      el("span", "tm", `${hhmmss(e.ts)} `),
-      el("span", "kd", e.kind.padEnd(9)),
-      el("span", "", e.ticker.padEnd(11) + " "),
-      el("span", "dt", e.detail),
-    );
-    box.append(ln, el("div", "tl-r", e.reason));
-  }
-  const cur = el("div");
-  cur.append(el("span", "cursor"));
-  box.append(cur);
-  if (atBottom || renderTail.first !== false) box.scrollTop = box.scrollHeight;
-  renderTail.first = false;
-  renderTail.lastLine = S.log.length ? S.log[S.log.length - 1].line : 0;
-  $("tailCount").textContent = `${S.sessionLines} line${S.sessionLines === 1 ? "" : "s"}`;
+// ---------- log: tail + feed are append-only so a full night stays fast ----------
+const TAIL_MAX = 400; // the tail is a live window; the feed below keeps the whole session
+let logCount = 0;
+
+function tailLine(e) {
+  const win = e.kind === "EXIT" && (e.pnlUsd ?? 0) >= 0;
+  const ln = el("div", `tl ${e.kind}${e.kind === "EXIT" ? (win ? " win" : " loss") : ""}`);
+  ln.append(
+    el("span", "ln", `#${String(e.line).padStart(4, "0")} `),
+    el("span", "tm", `${hhmmss(e.ts)} `),
+    el("span", "kd", e.kind.padEnd(9)),
+    el("span", "", e.ticker.padEnd(11) + " "),
+    el("span", "dt", e.detail),
+  );
+  const wrap = el("div");
+  wrap.append(ln, el("div", "tl-r", e.reason));
+  return wrap;
 }
 
-function renderFeed() {
-  const box = $("feed");
-  box.replaceChildren();
-  const rows = S.log.slice(-60).reverse();
-  if (!rows.length) return box.append(el("div", "feed-empty", "no decisions yet — every one will land here with its reason"));
-  rows.forEach((e, i) => {
-    const win = (e.pnlUsd ?? 0) >= 0;
-    const r = el("div", `fr k-${e.kind}${e.kind === "EXIT" ? (win ? " win" : " loss") : ""}${i === 0 ? " newest" : ""}`);
-    const main = el("div", "fr-main");
-    main.append(el("div", "fr-tk", e.ticker), el("div", "fr-rs", e.reason));
-    let right;
-    if (e.kind === "EXIT") right = el("div", "fr-right " + (win ? "green" : "red"), e.detail);
-    else if (e.kind === "FILTERED") right = el("div", "fr-right nt", "not traded");
-    else right = el("div", "fr-right", e.detail);
-    r.append(el("div", "fr-time", hhmm(e.ts)), el("div", "fr-badge", e.kind), main, right);
-    box.append(r);
-  });
+function feedRow(e) {
+  const win = (e.pnlUsd ?? 0) >= 0;
+  const r = el("div", `fr k-${e.kind}${e.kind === "EXIT" ? (win ? " win" : " loss") : ""}`);
+  const main = el("div", "fr-main");
+  main.append(el("div", "fr-tk", e.ticker), el("div", "fr-rs", e.reason));
+  let right;
+  if (e.kind === "EXIT") right = el("div", "fr-right " + (win ? "green" : "red"), e.detail);
+  else if (e.kind === "FILTERED") right = el("div", "fr-right nt", "not traded");
+  else right = el("div", "fr-right", e.detail);
+  r.append(el("div", "fr-time", hhmm(e.ts)), el("div", "fr-badge", e.kind), main, right);
+  return r;
+}
+
+const nearBottom = (box) => box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+
+function appendLog(entries, reset) {
+  const tail = $("tail"), feed = $("feed");
+  const stickTail = reset || nearBottom(tail), stickFeed = reset || nearBottom(feed);
+  if (reset) {
+    tail.replaceChildren();
+    feed.replaceChildren();
+    logCount = 0;
+  }
+  $("tailCursor")?.remove();
+  feed.querySelector(".feed-empty")?.remove();
+  feed.querySelector(".newest")?.classList.remove("newest");
+  const tf = document.createDocumentFragment(), ff = document.createDocumentFragment();
+  for (const e of entries) { tf.append(tailLine(e)); ff.append(feedRow(e)); }
+  tail.append(tf);
+  feed.append(ff);
+  logCount += entries.length;
+  while (tail.childElementCount > TAIL_MAX) tail.firstElementChild.remove();
+  const cur = el("div");
+  cur.id = "tailCursor";
+  cur.append(el("span", "cursor"));
+  tail.append(cur);
+  if (logCount) feed.lastElementChild.classList.add("newest");
+  else feed.append(el("div", "feed-empty", "no decisions yet — every one will land here, in order, with its reason"));
+  $("feedCount").textContent = `${logCount} in order · oldest first`;
+  $("tailCount").textContent = `${logCount} line${logCount === 1 ? "" : "s"}`;
+  if (stickTail) tail.scrollTop = tail.scrollHeight;
+  if (stickFeed) feed.scrollTop = feed.scrollHeight;
 }
 
 function renderResult() {
@@ -272,6 +285,8 @@ function connect() {
   ws.onmessage = (m) => {
     const msg = JSON.parse(m.data);
     if (msg.type === "state") { S = msg.state; render(); }
+    if (msg.type === "history") appendLog(msg.entries, true);
+    if (msg.type === "log") appendLog([msg.entry], false);
     if (msg.type === "notice") { $("notice").textContent = "· " + msg.text; }
   };
   ws.onclose = () => { $("lastEvent").textContent = "DISCONNECTED · RETRYING"; setTimeout(connect, 2000); };

@@ -38,7 +38,7 @@ export const liveMarket: Market = {
     return (Number(held) / Number(facts.supply)) * 100;
   },
   async sellTest(mint) {
-    const holders = await sol.sellSimHolders(mint, 2);
+    const holders = await sol.sellSimHolders(mint, (await rugReport(mint)).topHolderOwners);
     if (!holders.length) return "sell simulation failed: no holder wallet to simulate";
     for (const h of holders) {
       const err = await jup.simulateHolderSell(mint, h.owner, h.amount / 10n || 1n);

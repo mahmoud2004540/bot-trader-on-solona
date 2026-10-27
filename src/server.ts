@@ -34,7 +34,8 @@ export function startServer() {
   const wss = new WebSocketServer({ server: http, path: "/ws" });
   wss.on("connection", (ws, req) => {
     if (!authorized(req.url)) return ws.close(4001, "token required");
-    ws.send(json({ type: "state", state }));
+    ws.send(json({ type: "state", state: { ...state, log: undefined } }));
+    ws.send(json({ type: "history", entries: state.log }));
     ws.on("message", (raw) => {
       let msg: any;
       try {
@@ -49,10 +50,15 @@ export function startServer() {
     });
   });
 
-  bus.on("state", (s) => {
-    const payload = json({ type: "state", state: s });
+  // The full night's log can be thousands of entries, so it is not part of the state
+  // snapshot: clients get it once ("history") and then one "log" message per decision.
+  const broadcast = (msg: unknown) => {
+    const payload = json(msg);
     for (const c of wss.clients) if (c.readyState === WebSocket.OPEN) c.send(payload);
-  });
+  };
+  bus.on("state", (s) => broadcast({ type: "state", state: { ...s, log: undefined } }));
+  bus.on("log", (e) => broadcast({ type: "log", entry: e }));
+  bus.on("history", () => broadcast({ type: "history", entries: state.log }));
 
   http.listen(CONFIG.port, CONFIG.host, () => console.log(`dashboard → http://${CONFIG.host}:${CONFIG.port}`));
 }

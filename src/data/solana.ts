@@ -37,20 +37,29 @@ export async function tokenBalance(owner: PublicKey, mint: string): Promise<bigi
 /**
  * Real wallets (on-curve keys with SOL for fees) holding the token, largest first.
  * Used by the honeypot test to simulate a sell from an actual holder.
+ * Candidate owners come from getTokenLargestAccounts; the public RPC blocks that call, so
+ * `fallbackOwners` (rugcheck's top holders) is used instead. Either way each holder's
+ * balance and SOL are re-read on-chain before use.
  */
-export async function sellSimHolders(mint: string, max = 4): Promise<{ owner: string; amount: bigint }[]> {
-  const largest = await conn.getTokenLargestAccounts(new PublicKey(mint));
-  const accs = largest.value.slice(0, 12);
-  const parsed = await conn.getMultipleParsedAccounts(accs.map((a) => a.address));
+let largestAccountsBlocked = false;
+
+export async function sellSimHolders(mint: string, fallbackOwners: string[], max = 2): Promise<{ owner: string; amount: bigint }[]> {
+  let owners = fallbackOwners;
+  if (!largestAccountsBlocked) try {
+    const largest = await conn.getTokenLargestAccounts(new PublicKey(mint));
+    const parsed = await conn.getMultipleParsedAccounts(largest.value.slice(0, 12).map((a) => a.address));
+    owners = parsed.value.flatMap((p) => (p && "parsed" in p.data ? [String(p.data.parsed.info.owner)] : []));
+  } catch {
+    largestAccountsBlocked = true; // don't burn ~7s of 429 retries on every check
+  }
   const out: { owner: string; amount: bigint }[] = [];
-  for (let i = 0; i < accs.length && out.length < max; i++) {
-    const p = parsed.value[i];
-    if (!p || !("parsed" in p.data)) continue;
-    const owner = new PublicKey(p.data.parsed.info.owner);
+  for (const o of [...new Set(owners)].slice(0, 12)) {
+    if (out.length >= max) break;
+    const owner = new PublicKey(o);
     if (!PublicKey.isOnCurve(owner.toBytes())) continue; // pool vaults/PDAs can't sign
-    const lamports = await conn.getBalance(owner);
-    if (lamports < 10_000_000) continue; // needs ~0.01 SOL for fees + temp rent
-    out.push({ owner: owner.toBase58(), amount: BigInt(accs[i].amount) });
+    if ((await conn.getBalance(owner)) < 10_000_000) continue; // needs ~0.01 SOL for fees + temp rent
+    const amount = await tokenBalance(owner, mint);
+    if (amount > 0n) out.push({ owner: o, amount });
   }
   return out;
 }

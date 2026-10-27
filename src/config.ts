@@ -16,7 +16,7 @@ export const CONFIG = {
   host: env("HOST", "127.0.0.1"),
   port: Number(env("PORT", "8787")),
   dashboardToken: env("DASHBOARD_TOKEN"),
-  dataDir: env("DATA_DIR", "data"),
+  dataDir: env("DATA_DIR", DEMO ? "data/demo" : "data"),
   paperStartUsd: Number(env("PAPER_START_USD", "100")),
 
   // Equity is held in USDC; every trade is USDC -> token -> USDC.
