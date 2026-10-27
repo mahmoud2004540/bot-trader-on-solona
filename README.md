@@ -13,6 +13,22 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Try it free first (Render free plan, paper mode)
+
+No card, no wallet, no real money: the real bot on the real market with simulated fills.
+On Render: **New → Blueprint** → this repo → branch `main` → **Blueprint Path: `render-free.yaml`** →
+set `DASHBOARD_TOKEN` (a password) → Deploy. Then open `https://<address>/?token=<password>`.
+
+Free instances have no disk and sleep after about 15 minutes with nobody on the site (it wakes up
+when you open it again, starting a fresh paper session). Good for watching it work; for overnight
+live trading use `render.yaml` below.
+
+### جرّبه ببلاش الأول (بالعربي)
+من غير كارت ومن غير فلوس، تداول وهمي على السوق الحقيقي:
+Render ← New ← Blueprint ← الريبو ده ← Branch: `main` ← **Blueprint Path: `render-free.yaml`** ←
+اكتب `DASHBOARD_TOKEN` (كلمة سر) ← Deploy. وبعدين افتح `https://العنوان/?token=كلمة-السر`.
+النسخة المجانية بتنام بعد حوالي 15 دقيقة لو محدش فاتح الموقع، وبتصحى لما تفتحه تاني.
+
 ## Website on your phone (Render, one button)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mahmoud2004540/bot-trader-on-solona/tree/claude/grok-bot-terminal-solana-fbkj8n)
@@ -177,6 +193,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | File | What it does |
 |---|---|
 | `package.json` | Scripts (`start`, `demo`, `typecheck`) and dependencies: `@solana/web3.js`, `ws`, `bs58`, `dotenv`; `tsx` runs TypeScript directly. |
+| `render-free.yaml` | Free Render trial: free plan, paper mode only, no disk, no wallet; asks only for `DASHBOARD_TOKEN`. |
 | `render.yaml` | One-click Render Blueprint: 1 instance, 1 GB disk at `/data`, `/healthz`, no auto-deploy; asks for `DASHBOARD_TOKEN` and `SOLANA_PRIVATE_KEY` on the deploy page. |
 | `railway.json` / `.nvmrc` | Server deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
 | `tsconfig.json` | Strict TypeScript, NodeNext modules, type-check only (`tsx` runs the code). |

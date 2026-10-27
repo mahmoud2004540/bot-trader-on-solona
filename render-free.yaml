@@ -1,0 +1,23 @@
+# FREE trial on Render: paper mode only (simulated fills on the real market, no wallet, no card).
+# Free instances have no disk and go to sleep after ~15 min with nobody on the website, so this
+# is for watching the bot work, not for overnight live trading. To go live later, deploy
+# render.yaml instead (paid instance + 1 GB disk) — live mode is refused without a disk.
+services:
+  - type: web
+    name: grok-bot-paper
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    numInstances: 1
+    autoDeployTrigger: "off"
+    envVars:
+      - key: CLOUD
+        value: "1"
+      - key: MODE
+        value: paper
+      - key: NODE_VERSION
+        value: "22"
+      - key: DASHBOARD_TOKEN
+        sync: false
