@@ -13,6 +13,41 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Website on your phone (server on Railway)
+
+The bot runs on a small cloud server 24/7, and its dashboard is a website you open on your phone
+with a password. No computer needed; everything below is done in the phone's browser. The repo is
+ready for Railway: `railway.json` runs `npm start` with exactly **1 replica** (two copies never trade
+the same wallet) and always restarts.
+
+1. Phantom → Add / Connect Wallet → **Create New Account** named "Grok Bot" → Settings → Manage
+   Accounts → Grok Bot → **Show Private Key** → copy it.
+2. **railway.com** → sign in with GitHub → **New Project → Deploy from GitHub repo** → this repo.
+   Service **Settings → Source → Branch** → `claude/grok-bot-terminal-solana-fbkj8n`.
+3. Add a **Volume** to the service, mount path `/data`. Live trading stays off without it, because
+   the open position, log and database must survive restarts.
+4. **Variables**:
+   - `DASHBOARD_TOKEN` = a long password of your choice;
+   - `SOLANA_PRIVATE_KEY` = the key from step 1;
+   - optionally `SOLANA_RPC_URL` = a free Helius/QuickNode URL (the public RPC rate-limits shared server IPs).
+5. **Settings → Networking → Generate Domain**, then open `https://<domain>/?token=<password>` on the
+   phone and bookmark it.
+6. In Phantom, send USDC to Grok Bot plus about 0.05 SOL for fees. You see every trade in Phantom too,
+   and you withdraw from there.
+
+On the server the website is public, so every visitor needs the token, including the server itself.
+Without `DASHBOARD_TOKEN` it shows only a "locked" page. Railway is paid (about $5/month); check their
+current pricing.
+
+### موقع على الموبايل (بالعربي)
+1. في فانتوم اعمل حساب جديد اسمه Grok Bot ← Show Private Key ← انسخ المفتاح.
+2. **railway.com** ← سجّل دخول بـ GitHub ← New Project ← Deploy from GitHub repo ← الريبو ده.
+   من Settings ← Source ← Branch اختار `claude/grok-bot-terminal-solana-fbkj8n`.
+3. ضيف **Volume** والـ mount path يكون `/data`. من غيره مش هيشغّل LIVE.
+4. في **Variables** ضيف `DASHBOARD_TOKEN` (كلمة سر طويلة) و`SOLANA_PRIVATE_KEY` (المفتاح).
+5. Settings ← Networking ← **Generate Domain**، وافتح `https://الدومين/?token=كلمة-السر` واعمله bookmark.
+6. ابعت USDC لحساب Grok Bot و0.05 SOL للرسوم.
+
 ## Quick start
 
 ```bash
@@ -111,13 +146,14 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | File | What it does |
 |---|---|
 | `package.json` | Scripts (`start`, `demo`, `typecheck`) and dependencies: `@solana/web3.js`, `ws`, `bs58`, `dotenv`; `tsx` runs TypeScript directly. |
+| `railway.json` / `.nvmrc` | Server deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
 | `tsconfig.json` | Strict TypeScript, NodeNext modules, type-check only (`tsx` runs the code). |
 | `.env.example` | Every setting, documented. Copy it to `.env`. |
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
 | `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer awake (caffeinate / SetThreadExecutionState / systemd-inhibit). |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |
-| `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. |
+| `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. Detects a cloud server (`CLOUD`) and its volume. |
 | `src/types.ts` | Shared data shapes: `PairSnapshot`, `Candidate`, `MintFacts`, `RugResult`, `Quote`, `Position`, `ClosedTrade`, `LogEntry`. |
 | `src/util.ts` | Fetch with timeout, untrusted-label sanitising, money and percent formatting, bigint/UI unit conversion. |
 | `src/state.ts` | The single in-memory dashboard state plus `update()`/`setAgent()`. Changes are batched into one WebSocket broadcast every 150 ms. |

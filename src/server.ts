@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
-import { CONFIG } from "./config.js";
+import { CLOUD, CONFIG } from "./config.js";
 import { bus, state } from "./state.js";
 import { redact } from "./security/wallet.js";
 import { setMode } from "./orchestrator.js";
@@ -20,13 +20,23 @@ const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 // phone when HOST=0.0.0.0). A request relayed by a proxy carries X-Forwarded-For and is never
 // treated as local, even if the proxy itself connects over loopback.
 const isLocal = (req: IncomingMessage) => LOOPBACK.has(req.socket.remoteAddress ?? "") && !req.headers["x-forwarded-for"];
+// On a cloud server the dashboard is a public website: every visitor needs the token.
 const authorized = (req: IncomingMessage) =>
-  !CONFIG.dashboardToken || isLocal(req) || new URL(req.url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken;
+  (!CLOUD && (!CONFIG.dashboardToken || isLocal(req))) ||
+  (Boolean(CONFIG.dashboardToken) && new URL(req.url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken);
+
+const CLOUD_NO_TOKEN = `Grok Bot Terminal is running, but the website is locked.
+
+Add a variable named DASHBOARD_TOKEN (a long password of your choice) to this service,
+then open:  https://<this-address>/?token=<that password>
+`;
 
 export function startServer() {
   // The page's HTML/CSS/JS are static and hold no data; everything live (state, log, the
   // mode toggle) goes over the WebSocket, which is where the token is enforced.
   const http = createServer(async (req, res) => {
+    if (CLOUD && !CONFIG.dashboardToken)
+      return void res.writeHead(503, { "content-type": "text/plain; charset=utf-8" }).end(CLOUD_NO_TOKEN);
     const path = new URL(req.url ?? "/", "http://x").pathname;
     const file = normalize(join(PUBLIC, path === "/" ? "index.html" : path));
     if (!file.startsWith(PUBLIC)) return void res.writeHead(403).end();

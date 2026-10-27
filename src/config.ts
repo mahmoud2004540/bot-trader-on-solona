@@ -6,6 +6,15 @@ const env = (k: string, d = "") => process.env[k]?.trim() || d;
 
 export const DEMO = process.argv.includes("--demo");
 
+/**
+ * Running on a cloud server (Railway sets RAILWAY_*; CLOUD=1 for any other host).
+ * The dashboard is then a public website: it binds 0.0.0.0, stays locked until
+ * DASHBOARD_TOKEN is set, and data lives on the attached volume.
+ */
+export const CLOUD = Boolean(process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_ENVIRONMENT_ID || process.env.CLOUD === "1");
+/** Persistent disk on the server. Without one, a redeploy would forget an open position. */
+const VOLUME = process.env.RAILWAY_VOLUME_MOUNT_PATH?.trim() || (process.env.CLOUD === "1" ? process.env.DATA_DIR?.trim() : "") || "";
+
 export const CONFIG = {
   // ---- runtime ----
   mode: (env("MODE", "live") === "paper" ? "paper" : "live") as "live" | "paper",
@@ -13,10 +22,12 @@ export const CONFIG = {
   jupiterBase: env("JUPITER_BASE_URL", "https://lite-api.jup.ag/swap/v1"),
   jupiterApiKey: env("JUPITER_API_KEY"),
   birdeyeApiKey: env("BIRDEYE_API_KEY"),
-  host: env("HOST", "127.0.0.1"),
+  host: env("HOST", CLOUD ? "0.0.0.0" : "127.0.0.1"),
   port: Number(env("PORT", "8787")),
   dashboardToken: env("DASHBOARD_TOKEN"),
-  dataDir: env("DATA_DIR", DEMO ? "data/demo" : "data"),
+  dataDir: env("DATA_DIR", VOLUME || (DEMO ? "data/demo" : "data")),
+  /** live trading on a cloud server needs a persistent volume (see VOLUME above) */
+  cloudVolume: Boolean(VOLUME),
   paperStartUsd: Number(env("PAPER_START_USD", "100")),
 
   // Equity is held in USDC; every trade is USDC -> token -> USDC.
