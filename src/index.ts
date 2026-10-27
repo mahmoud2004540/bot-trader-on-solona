@@ -1,6 +1,6 @@
 // Entry point: load wallet (key stays inside security/wallet.ts), pick market, start
 // dashboard and the agent loop.
-import { CONFIG, DEMO } from "./config.js";
+import { CLOUD, CONFIG, DEMO } from "./config.js";
 import { loadWallet, redact } from "./security/wallet.js";
 import { update, state } from "./state.js";
 import { liveMarket } from "./data/market.js";
@@ -8,7 +8,7 @@ import { simMarket } from "./data/sim.js";
 import { startSession } from "./agents/equity.js";
 import { startServer } from "./server.js";
 import { savePosition } from "./agents/logger.js";
-import { restorePosition, run } from "./orchestrator.js";
+import { liveBlockedReason, restorePosition, run } from "./orchestrator.js";
 import { conn } from "./data/solana.js";
 
 async function main() {
@@ -18,11 +18,15 @@ async function main() {
   if (mode === "live" && !wallet) {
     mode = "paper";
     notice = DEMO ? "demo · synthetic market, paper only" : "connect Phantom to go live · paper until then";
+  } else if (mode === "live" && liveBlockedReason()) {
+    mode = "paper";
+    notice = `${liveBlockedReason()} · paper until then`;
   }
   update((s) => {
     s.mode = mode;
     s.liveAvailable = Boolean(wallet);
     s.needsSetup = !wallet && !DEMO;
+    s.cloud = CLOUD;
     s.wallet = wallet ? wallet.toBase58() : null;
     s.notice = notice;
   });

@@ -13,6 +13,40 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Phone only, no computer: run it in the cloud (Railway)
+
+The bot can't run on a phone overnight, because the phone sleeps and closes the app. Instead it runs
+24/7 on a small cloud server, and you set it up and watch it from the phone's browser. The repo is
+ready for Railway (`railway.json`: start `npm start`, **1 replica** so two copies never trade the
+same wallet, always restart).
+
+1. On railway.com sign in with GitHub → **New Project → Deploy from GitHub repo** → pick this repo.
+   In the service's **Settings → Source → Branch**, choose `claude/grok-bot-terminal-solana-fbkj8n`.
+2. **Add a Volume** to the service with mount path `/data`. This is required for live trading:
+   the open position, the log and the database survive restarts and redeploys there.
+3. **Variables** → add:
+   - `DASHBOARD_TOKEN` = a long password of your choice (the dashboard is on the internet),
+   - `SOLANA_PRIVATE_KEY` = the private key of a new Phantom account called "Grok Bot".
+4. **Settings → Networking → Generate Domain**, then open `https://<that-domain>/?token=<your password>`
+   on the phone and bookmark it.
+5. In Phantom, send USDC or SOL to the Grok Bot account, keeping at least 0.05 SOL in it for fees.
+
+In the cloud the bot binds `0.0.0.0`, the dashboard requires the token from every device, the
+paste-the-key card is disabled (the key comes only from the Variables), and live mode stays off until
+a volume is attached. Railway is a paid service (a few dollars a month); check their current pricing.
+
+### من التليفون بس (بالعربي)
+
+البوت ما ينفعش يشتغل على التليفون طول الليل، لأن التليفون بينام وبيقفل الأبلكيشن. الحل إنه يشتغل على
+سيرفر صغير في Railway على طول، وانت تجهّزه وتتابعه من متصفح التليفون:
+
+1. railway.com ← سجّل دخول بـ GitHub ← New Project ← Deploy from GitHub repo ← اختار الريبو ده.
+   من Settings ← Source ← Branch اختار `claude/grok-bot-terminal-solana-fbkj8n`.
+2. ضيف **Volume** للخدمة، والـ mount path يكون `/data`. ده لازم عشان LIVE.
+3. Variables ← ضيف `DASHBOARD_TOKEN` (كلمة سر طويلة) و`SOLANA_PRIVATE_KEY` (مفتاح حساب Grok Bot من فانتوم).
+4. Settings ← Networking ← Generate Domain، وافتح `https://الدومين/?token=كلمة-السر` واعمله bookmark.
+5. من فانتوم ابعت USDC أو SOL لحساب Grok Bot، وخلّي فيه 0.05 SOL على الأقل للرسوم.
+
 ## Zero-setup start (with Phantom)
 
 1. Install **Node.js 22+** from nodejs.org (once).
@@ -144,8 +178,10 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 - **The dashboard binds to `127.0.0.1`.** To watch it from your phone on the home Wi-Fi, add
   `HOST=0.0.0.0` **and** `DASHBOARD_TOKEN=<a long password>` to `.env`, then open
   `http://<pc-ip>:8787/?token=<password>` on the phone. The computer itself never needs the token;
-  every other device does, because the live/paper toggle is on that page. Wallet setup stays
-  computer-only.
+  every other device does, because the live/paper toggle is on that page. The token guards the
+  WebSocket, which carries all live data and the toggle; the page's static HTML/CSS/JS hold no data.
+  Wallet setup stays computer-only. Requests relayed by a proxy (`X-Forwarded-For`) are never
+  treated as local.
 
 ## Every file explained
 
@@ -159,6 +195,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit). |
 | `src/funding.ts` | Wallet watcher (live only). Shows SOL/USDC on the dashboard, holds trading quietly until there is at least $5 USDC, converts deposited SOL to USDC (keeping 0.05 SOL for fees), and moves START to the deposited amount before the first trade. |
 | `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
+| `railway.json` / `.nvmrc` | Cloud deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
 | `.gitattributes` | Keeps Windows line endings for the `.bat` and Unix line endings for the shell launchers. |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |
 | `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. |

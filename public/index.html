@@ -171,7 +171,7 @@
     <p class="setup-why">Phantom asks you to approve every transaction, so it can't trade while you sleep.
       Give the bot its <b>own Phantom account</b> instead: it trades from it, and you watch and withdraw from it in Phantom anytime.</p>
     <p class="ar" dir="rtl">فانتوم بيطلب موافقة على كل عملية، فمش هيقدر يتداول وانت نايم. اعمل للبوت حساب لوحده جوه فانتوم: البوت يتداول منه، وانت تشوفه وتسحب منه من فانتوم في أي وقت.</p>
-    <ol class="steps">
+    <ol id="stepsLocal" class="steps">
       <li><b>Phantom → account menu → Add / Connect Wallet → Create New Account.</b> Name it <span class="mono">Grok Bot</span>.
         <div class="ar" dir="rtl">في فانتوم: قائمة الحسابات ← Add / Connect Wallet ← Create New Account، وسمّيه Grok Bot.</div></li>
       <li><b>Settings → Manage Accounts → Grok Bot → Show Private Key</b> → copy it.
@@ -185,6 +185,16 @@
         <div id="setupMsg" class="setup-msg"></div></li>
       <li><b>From your main Phantom account, send USDC or SOL to Grok Bot</b> (Send → My accounts → Grok Bot). Keep at least 0.05 SOL in it for fees; extra SOL is converted to USDC automatically.
         <div class="ar" dir="rtl">من حسابك الأساسي في فانتوم ابعت USDC أو SOL لحساب Grok Bot. خلّي فيه 0.05 SOL على الأقل للرسوم، والباقي بيتحول USDC لوحده.</div></li>
+    </ol>
+    <ol id="stepsCloud" class="steps hidden">
+      <li><b>Phantom → account menu → Add / Connect Wallet → Create New Account.</b> Name it <span class="mono">Grok Bot</span>.
+        <div class="ar" dir="rtl">في فانتوم: قائمة الحسابات ← Add / Connect Wallet ← Create New Account، وسمّيه Grok Bot.</div></li>
+      <li><b>Settings → Manage Accounts → Grok Bot → Show Private Key</b> → copy it.
+        <div class="ar" dir="rtl">الإعدادات ← Manage Accounts ← Grok Bot ← Show Private Key ← انسخه.</div></li>
+      <li><b>Railway → this service → Variables → New Variable:</b> name <span class="mono">SOLANA_PRIVATE_KEY</span>, value = paste → <b>Deploy</b>. The bot restarts and goes LIVE by itself.
+        <div class="ar" dir="rtl">في Railway: الخدمة ← Variables ← New Variable، الاسم SOLANA_PRIVATE_KEY والقيمة الصق المفتاح ← Deploy. البوت هيعمل ريستارت ويبقى LIVE لوحده.</div></li>
+      <li><b>From your main Phantom account, send USDC or SOL to Grok Bot</b>, keeping at least 0.05 SOL in it for fees.
+        <div class="ar" dir="rtl">من حسابك الأساسي ابعت USDC أو SOL لحساب Grok Bot، وخلّي فيه 0.05 SOL على الأقل للرسوم.</div></li>
     </ol>
     <p class="setup-risk">Use only money you can afford to lose. Memecoins can go to zero in seconds.
       <span class="ar" dir="rtl">استخدم فلوس تقدر تستغنى عنها بس.</span></p>

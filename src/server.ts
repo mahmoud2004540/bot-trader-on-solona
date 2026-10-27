@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import type { IncomingMessage } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { WebSocketServer, WebSocket } from "ws";
-import { CONFIG } from "./config.js";
+import { CLOUD, CONFIG } from "./config.js";
 import { bus, state } from "./state.js";
 import { connectWallet, redact, walletPublicKey } from "./security/wallet.js";
 import { goLiveWhenFlat, setMode } from "./orchestrator.js";
@@ -21,10 +21,19 @@ const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
 // The computer running the bot is trusted; DASHBOARD_TOKEN is only asked of other devices
 // (your phone on the home Wi-Fi when HOST=0.0.0.0).
+// A request relayed by a reverse proxy (cloud host, tunnel) carries X-Forwarded-For and
+// is never treated as local, even if the proxy itself connects over loopback.
+const isLocal = (req: IncomingMessage) => LOOPBACK.has(req.socket.remoteAddress ?? "") && !req.headers["x-forwarded-for"];
 const authorized = (req: IncomingMessage) =>
-  !CONFIG.dashboardToken ||
-  LOOPBACK.has(req.socket.remoteAddress ?? "") ||
-  new URL(req.url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken;
+  (!CONFIG.dashboardToken && !CLOUD) ||
+  (!CLOUD && isLocal(req)) ||
+  (Boolean(CONFIG.dashboardToken) && new URL(req.url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken);
+
+const CLOUD_NO_TOKEN = `Grok Bot Terminal is running, but the dashboard is locked.
+
+Add a variable named DASHBOARD_TOKEN (a long password of your choice) to this service,
+then open:  https://<this-address>/?token=<that password>
+`;
 
 const ENV_PATH = join(process.cwd(), ".env");
 
@@ -39,7 +48,8 @@ const ENV_PATH = join(process.cwd(), ".env");
 async function handleSetup(req: IncomingMessage): Promise<[number, object]> {
   const host = String(req.headers.host ?? "").replace(/:\d+$/, "");
   const origin = req.headers.origin;
-  if (!LOOPBACK.has(req.socket.remoteAddress ?? "") || !["127.0.0.1", "localhost", "[::1]"].includes(host))
+  if (CLOUD) return [403, { error: "in the cloud, add SOLANA_PRIVATE_KEY in the service's Variables instead" }];
+  if (!isLocal(req) || !["127.0.0.1", "localhost", "[::1]"].includes(host))
     return [403, { error: "setup only works on this computer: open http://127.0.0.1:" + CONFIG.port }];
   if (origin && origin !== `http://${req.headers.host}`) return [403, { error: "cross-site request refused" }];
   if (!String(req.headers["content-type"]).startsWith("application/json")) return [415, { error: "json only" }];
@@ -77,8 +87,11 @@ async function handleSetup(req: IncomingMessage): Promise<[number, object]> {
 
 export function startServer() {
   const http = createServer(async (req, res) => {
-    if (!authorized(req)) return void res.writeHead(401).end("token required");
+    if (CLOUD && !CONFIG.dashboardToken) return void res.writeHead(503, { "content-type": "text/plain; charset=utf-8" }).end(CLOUD_NO_TOKEN);
+    // The page's HTML/CSS/JS are static and hold no data; everything live (state, log, the
+    // mode toggle) goes over the WebSocket, which is where the token is enforced.
     if (req.url?.startsWith("/api/setup")) {
+      if (!authorized(req)) return void res.writeHead(401).end();
       if (req.method !== "POST") return void res.writeHead(405).end();
       const [code, body] = await handleSetup(req).catch(() => [500, { error: "setup failed" }] as [number, object]);
       return void res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));

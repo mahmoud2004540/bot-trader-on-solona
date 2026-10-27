@@ -110,6 +110,8 @@ function render() {
 let setupDismissed = false;
 let justConnected = false; // keep the card open after connecting so step 4 (fund it) is seen
 function renderWallet() {
+  $("stepsLocal").classList.toggle("hidden", !!S.cloud);
+  $("stepsCloud").classList.toggle("hidden", !S.cloud);
   $("setup").classList.toggle("hidden", !((S.needsSetup && !setupDismissed) || justConnected));
   $("openSetup").classList.toggle("hidden", !S.needsSetup || !setupDismissed);
   $("walletBar").classList.toggle("hidden", !S.wallet);
@@ -303,7 +305,15 @@ function connect() {
     if (msg.type === "log") appendLog([msg.entry], false);
     if (msg.type === "notice") { $("notice").textContent = "· " + msg.text; }
   };
-  ws.onclose = () => { $("lastEvent").textContent = "DISCONNECTED · RETRYING"; setTimeout(connect, 2000); };
+  ws.onclose = (ev) => {
+    if (ev.code === 4001) {
+      $("lastEvent").textContent = "LOCKED · OPEN WITH ?token=YOUR-PASSWORD";
+      $("notice").textContent = "· wrong or missing password in the address";
+      return; // retrying won't help until the address has the right token
+    }
+    $("lastEvent").textContent = "DISCONNECTED · RETRYING";
+    setTimeout(connect, 2000);
+  };
 }
 connect();
 

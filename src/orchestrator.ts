@@ -1,6 +1,6 @@
 // Wires the six agents into one pipeline:  SCAN → CHECK → SIZE → EXEC → LOG → EQUITY.
 // One position at a time: while a position is open the loop only monitors it.
-import { CONFIG } from "./config.js";
+import { CLOUD, CONFIG } from "./config.js";
 import { state, update, setAgent } from "./state.js";
 import { redact, walletPublicKey } from "./security/wallet.js";
 import { scan } from "./agents/scanner.js";
@@ -18,6 +18,10 @@ import type { Mode } from "./types.js";
 const seen = new Map<string, number>(); // mint -> last time we decided on it
 const recentlyDecided = (mint: string) => Date.now() - (seen.get(mint) ?? 0) < CONFIG.recheckFilteredAfterMs;
 let busy = false; // true while a swap is in flight; blocks mode switches
+
+/** Cloud without a volume: a redeploy would wipe the saved open position, so no live trading. */
+export const liveBlockedReason = () =>
+  CLOUD && !CONFIG.cloudVolume ? "attach a Volume to the service (mount path /data) to go live" : null;
 
 // Mode changes are queued and applied by the loop between scans, never in the middle of one,
 // so a token checked and sized in paper can't end up bought with real money (and vice versa).
@@ -40,6 +44,7 @@ export function setMode(mode: Mode): string | null {
   if (mode === state.mode && !pendingMode) return null;
   if (state.position || busy) return "close the open position before switching mode";
   if (mode === "live" && !walletPublicKey()) return "connect your Phantom wallet first (setup card)";
+  if (mode === "live" && liveBlockedReason()) return liveBlockedReason();
   pendingMode = mode;
   wake?.();
   return null;

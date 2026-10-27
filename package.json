@@ -24,12 +24,12 @@
     "@solana/web3.js": "^1.99.0",
     "bs58": "^6.0.0",
     "dotenv": "^18.0.9",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/ws": "^8.18.2",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   },
   "type": "module",
