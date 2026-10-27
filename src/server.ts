@@ -17,10 +17,15 @@ const PUBLIC = join(process.cwd(), "public");
 const TYPES: Record<string, string> = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".svg": "image/svg+xml" };
 
 const json = (v: unknown) => redact(JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x)));
-const authorized = (url: string | undefined) =>
-  !CONFIG.dashboardToken || new URL(url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken;
-
 const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+// The computer running the bot is trusted; DASHBOARD_TOKEN is only asked of other devices
+// (your phone on the home Wi-Fi when HOST=0.0.0.0).
+const authorized = (req: IncomingMessage) =>
+  !CONFIG.dashboardToken ||
+  LOOPBACK.has(req.socket.remoteAddress ?? "") ||
+  new URL(req.url ?? "/", "http://x").searchParams.get("token") === CONFIG.dashboardToken;
+
 const ENV_PATH = join(process.cwd(), ".env");
 
 /**
@@ -72,7 +77,7 @@ async function handleSetup(req: IncomingMessage): Promise<[number, object]> {
 
 export function startServer() {
   const http = createServer(async (req, res) => {
-    if (!authorized(req.url)) return void res.writeHead(401).end("token required");
+    if (!authorized(req)) return void res.writeHead(401).end("token required");
     if (req.url?.startsWith("/api/setup")) {
       if (req.method !== "POST") return void res.writeHead(405).end();
       const [code, body] = await handleSetup(req).catch(() => [500, { error: "setup failed" }] as [number, object]);
@@ -91,7 +96,7 @@ export function startServer() {
 
   const wss = new WebSocketServer({ server: http, path: "/ws" });
   wss.on("connection", (ws, req) => {
-    if (!authorized(req.url)) return ws.close(4001, "token required");
+    if (!authorized(req)) return ws.close(4001, "token required");
     ws.send(json({ type: "state", state: { ...state, log: undefined } }));
     ws.send(json({ type: "history", entries: state.log }));
     ws.on("message", (raw) => {

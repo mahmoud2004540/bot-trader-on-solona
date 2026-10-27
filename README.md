@@ -141,9 +141,11 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 - **Token metadata is untrusted.** Names and symbols are reduced to short alphanumeric labels
   (`untrustedLabel`). Descriptions, websites and socials are never fetched or read. The dashboard
   inserts every data value with `textContent`, never `innerHTML`.
-- **The dashboard binds to `127.0.0.1`.** To use it from your phone, set `HOST=0.0.0.0` **and**
-  `DASHBOARD_TOKEN`, then open `http://<pc-ip>:8787/?token=…`. The live/paper toggle can be
-  reached by anyone who can open the page.
+- **The dashboard binds to `127.0.0.1`.** To watch it from your phone on the home Wi-Fi, add
+  `HOST=0.0.0.0` **and** `DASHBOARD_TOKEN=<a long password>` to `.env`, then open
+  `http://<pc-ip>:8787/?token=<password>` on the phone. The computer itself never needs the token;
+  every other device does, because the live/paper toggle is on that page. Wallet setup stays
+  computer-only.
 
 ## Every file explained
 
