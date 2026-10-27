@@ -13,6 +13,37 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
+## Website on your phone (Render, one button)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mahmoud2004540/bot-trader-on-solona/tree/claude/grok-bot-terminal-solana-fbkj8n)
+
+The bot runs 24/7 on a Render server, and the dashboard is a website you open on your phone with a
+password. Everything is done from the phone's browser:
+
+1. **Phantom:** Add / Connect Wallet → **Create New Account** named "Grok Bot" → Settings → Manage
+   Accounts → Grok Bot → **Show Private Key** → copy it.
+2. Tap the **Deploy to Render** button above → sign in to Render with GitHub.
+3. Render shows the settings from `render.yaml` and asks for two values:
+   - `DASHBOARD_TOKEN`: a long password of your choice (you'll use it to open the site);
+   - `SOLANA_PRIVATE_KEY`: the key from step 1.
+
+   Then **Apply / Deploy**.
+4. When it's live, Render shows the address (`https://grok-bot-terminal-xxxx.onrender.com`). Open
+   `https://<that address>/?token=<your password>` on the phone and bookmark it.
+5. In Phantom, send USDC to Grok Bot plus about 0.05 SOL for fees.
+
+`render.yaml` sets up exactly 1 instance (two copies never trade the same wallet), a 1 GB disk at
+`/data` (open position, log and database survive restarts), a `/healthz` health check, and no
+auto-redeploy on git pushes. Render needs a paid instance for a disk; check render.com/pricing. If the
+deploy page picks the wrong branch, set it to `claude/grok-bot-terminal-solana-fbkj8n`.
+
+### موقع على الموبايل بزرار واحد (Render)
+1. في فانتوم اعمل حساب جديد اسمه Grok Bot ← Show Private Key ← انسخ المفتاح.
+2. دوس زرار **Deploy to Render** اللي فوق ← سجّل دخول بـ GitHub.
+3. هيطلب منك حاجتين: `DASHBOARD_TOKEN` (كلمة سر من عندك) و`SOLANA_PRIVATE_KEY` (المفتاح) ← Deploy.
+4. لما يخلص هيديك عنوان. افتح `https://العنوان/?token=كلمة-السر` على الموبايل واعمله bookmark.
+5. ابعت USDC لحساب Grok Bot و0.05 SOL للرسوم.
+
 ## Website on your phone (server on Railway)
 
 The bot runs on a small cloud server 24/7, and its dashboard is a website you open on your phone
@@ -146,6 +177,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | File | What it does |
 |---|---|
 | `package.json` | Scripts (`start`, `demo`, `typecheck`) and dependencies: `@solana/web3.js`, `ws`, `bs58`, `dotenv`; `tsx` runs TypeScript directly. |
+| `render.yaml` | One-click Render Blueprint: 1 instance, 1 GB disk at `/data`, `/healthz`, no auto-deploy; asks for `DASHBOARD_TOKEN` and `SOLANA_PRIVATE_KEY` on the deploy page. |
 | `railway.json` / `.nvmrc` | Server deploy config for Railway (start command, exactly 1 replica, always restart) and the Node version (22). |
 | `tsconfig.json` | Strict TypeScript, NodeNext modules, type-check only (`tsx` runs the code). |
 | `.env.example` | Every setting, documented. Copy it to `.env`. |

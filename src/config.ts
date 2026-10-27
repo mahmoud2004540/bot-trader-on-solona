@@ -7,7 +7,7 @@ const env = (k: string, d = "") => process.env[k]?.trim() || d;
 export const DEMO = process.argv.includes("--demo");
 
 /**
- * Running on a cloud server (Railway sets RAILWAY_*; CLOUD=1 for any other host).
+ * Running on a cloud server (Railway sets RAILWAY_*; render.yaml sets CLOUD=1 + DATA_DIR=/data).
  * The dashboard is then a public website: it binds 0.0.0.0, stays locked until
  * DASHBOARD_TOKEN is set, and data lives on the attached volume.
  */

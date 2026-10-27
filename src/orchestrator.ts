@@ -20,7 +20,7 @@ let busy = false; // true while a swap is in flight; blocks mode switches
 
 /** Cloud without a volume: a redeploy would wipe the saved open position, so no live trading. */
 export const liveBlockedReason = () =>
-  CLOUD && !CONFIG.cloudVolume ? "attach a Volume to the service (mount path /data) to go live" : null;
+  CLOUD && !CONFIG.cloudVolume ? "attach a persistent disk/volume (mount path /data) to go live" : null;
 
 // Mode changes are queued and applied by the loop between scans, never in the middle of one,
 // so a token checked and sized in paper can't end up bought with real money (and vice versa).
@@ -35,7 +35,7 @@ const nap = (ms: number) =>
 export function setMode(mode: Mode): string | null {
   if (mode === state.mode && !pendingMode) return null;
   if (state.position || busy) return "close the open position before switching mode";
-  if (mode === "live" && !walletPublicKey()) return CLOUD ? "add SOLANA_PRIVATE_KEY in the server's Variables" : "live needs SOLANA_PRIVATE_KEY in .env";
+  if (mode === "live" && !walletPublicKey()) return CLOUD ? "add SOLANA_PRIVATE_KEY in the server's environment variables" : "live needs SOLANA_PRIVATE_KEY in .env";
   if (mode === "live" && liveBlockedReason()) return liveBlockedReason();
   pendingMode = mode;
   wake?.(); // apply within a moment instead of after the 20 s scan pause

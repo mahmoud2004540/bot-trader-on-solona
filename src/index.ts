@@ -20,7 +20,7 @@ async function main() {
     notice = DEMO
       ? "demo · synthetic market, paper only"
       : CLOUD
-        ? "add SOLANA_PRIVATE_KEY in the server's Variables to go live · paper until then"
+        ? "add SOLANA_PRIVATE_KEY in the server's environment variables to go live · paper until then"
         : "no SOLANA_PRIVATE_KEY — fell back to paper";
   } else if (mode === "live" && liveBlockedReason()) {
     mode = "paper";

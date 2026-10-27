@@ -35,6 +35,8 @@ export function startServer() {
   // The page's HTML/CSS/JS are static and hold no data; everything live (state, log, the
   // mode toggle) goes over the WebSocket, which is where the token is enforced.
   const http = createServer(async (req, res) => {
+    // health check for the hosting platform: says only "ok", no data
+    if (req.url === "/healthz") return void res.writeHead(200, { "content-type": "text/plain" }).end("ok");
     if (CLOUD && !CONFIG.dashboardToken)
       return void res.writeHead(503, { "content-type": "text/plain; charset=utf-8" }).end(CLOUD_NO_TOKEN);
     const path = new URL(req.url ?? "/", "http://x").pathname;
