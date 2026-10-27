@@ -279,6 +279,20 @@ setInterval(() => {
 
 // ---------- websocket ----------
 let ws;
+let locked = false;
+
+// Wrong or missing password: ask for it on the page instead of retrying forever.
+function askPassword() {
+  locked = true;
+  $("lastEvent").textContent = "LOCKED · ENTER YOUR PASSWORD";
+  const pw = prompt("Grok Bot password (DASHBOARD_TOKEN)");
+  if (pw && pw.trim()) {
+    const q = new URLSearchParams(location.search);
+    q.set("token", pw.trim());
+    location.search = q.toString(); // reload with ?token=…, so bookmarking keeps it
+  }
+}
+
 function connect() {
   const token = new URLSearchParams(location.search).get("token");
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws${token ? "?token=" + encodeURIComponent(token) : ""}`);
@@ -288,10 +302,11 @@ function connect() {
     if (msg.type === "history") appendLog(msg.entries, true);
     if (msg.type === "log") appendLog([msg.entry], false);
     if (msg.type === "notice") { $("notice").textContent = "· " + msg.text; }
+    if (msg.type === "locked") askPassword();
   };
   ws.onclose = (ev) => {
-    if (ev.code === 4001) {
-      $("lastEvent").textContent = "LOCKED · OPEN WITH ?token=YOUR-PASSWORD";
+    if (ev.code === 4001 || locked) {
+      if (!locked) askPassword();
       return; // retrying won't help until the address has the right token
     }
     $("lastEvent").textContent = "DISCONNECTED · RETRYING";
