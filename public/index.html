@@ -35,6 +35,13 @@
           <span id="lastEvent" class="evt-badge">BOOT · LOGGING ON</span>
         </div>
         <div class="tagline">every trade gets a reason <span id="notice" class="notice"></span></div>
+        <div id="walletBar" class="walletbar hidden">
+          <span class="wb-k">bot wallet</span>
+          <button id="wbAddr" class="wb-addr mono" type="button" title="copy address">—</button>
+          <span id="wbBal" class="mono muted"></span>
+          <span id="wbWarn" class="wb-warn hidden">send USDC or SOL to start</span>
+        </div>
+        <button id="openSetup" class="setup-btn hidden" type="button">connect Phantom → go live</button>
       </div>
     </div>
     <div class="bigstats">
@@ -150,6 +157,39 @@
     <div class="panel-h"><span>LOG FEED <span class="muted">· every decision tonight</span></span><span id="feedCount" class="muted mono">0 in order</span></div>
     <div id="feed" class="feed-body"></div>
   </section>
+</div>
+<!-- one-time setup: connect a Phantom account the bot can sign with -->
+<div id="setup" class="setup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+  <div class="setup-card">
+    <div class="setup-h">
+      <div class="logo small"><i></i><i></i></div>
+      <div>
+        <div id="setupTitle" class="setup-title">Connect Phantom</div>
+        <div class="muted setup-sub">one time · then it runs by itself every night</div>
+      </div>
+    </div>
+    <p class="setup-why">Phantom asks you to approve every transaction, so it can't trade while you sleep.
+      Give the bot its <b>own Phantom account</b> instead: it trades from it, and you watch and withdraw from it in Phantom anytime.</p>
+    <p class="ar" dir="rtl">فانتوم بيطلب موافقة على كل عملية، فمش هيقدر يتداول وانت نايم. اعمل للبوت حساب لوحده جوه فانتوم: البوت يتداول منه، وانت تشوفه وتسحب منه من فانتوم في أي وقت.</p>
+    <ol class="steps">
+      <li><b>Phantom → account menu → Add / Connect Wallet → Create New Account.</b> Name it <span class="mono">Grok Bot</span>.
+        <div class="ar" dir="rtl">في فانتوم: قائمة الحسابات ← Add / Connect Wallet ← Create New Account، وسمّيه Grok Bot.</div></li>
+      <li><b>Settings → Manage Accounts → Grok Bot → Show Private Key</b> → copy it.
+        <div class="ar" dir="rtl">الإعدادات ← Manage Accounts ← Grok Bot ← Show Private Key ← انسخه.</div></li>
+      <li><b>Paste it here.</b> It's saved only in <span class="mono">.env</span> on this computer and never shown, logged or sent anywhere.
+        <div class="ar" dir="rtl">الصقه هنا. بيتحفظ على الجهاز ده بس، ومش بيظهر أو يتبعت لأي حد.</div>
+        <form id="setupForm" class="setup-form" autocomplete="off">
+          <input id="setupKey" type="password" placeholder="paste Grok Bot private key" spellcheck="false" autocomplete="off" />
+          <button type="submit" id="setupGo">Connect</button>
+        </form>
+        <div id="setupMsg" class="setup-msg"></div></li>
+      <li><b>From your main Phantom account, send USDC or SOL to Grok Bot</b> (Send → My accounts → Grok Bot). Keep at least 0.05 SOL in it for fees; extra SOL is converted to USDC automatically.
+        <div class="ar" dir="rtl">من حسابك الأساسي في فانتوم ابعت USDC أو SOL لحساب Grok Bot. خلّي فيه 0.05 SOL على الأقل للرسوم، والباقي بيتحول USDC لوحده.</div></li>
+    </ol>
+    <p class="setup-risk">Use only money you can afford to lose. Memecoins can go to zero in seconds.
+      <span class="ar" dir="rtl">استخدم فلوس تقدر تستغنى عنها بس.</span></p>
+    <button id="setupLater" class="setup-later" type="button">not now · watch in paper mode</button>
+  </div>
 </div>
 <script src="app.js"></script>
 </body>

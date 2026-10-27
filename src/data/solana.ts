@@ -63,3 +63,32 @@ export async function sellSimHolders(mint: string, fallbackOwners: string[], max
   }
   return out;
 }
+
+/**
+ * Creator = fee payer of the mint's very first transaction (on pump.fun & co. that's the dev).
+ * Walks signatures back to the oldest; gives up (null → rug check rejects) on very busy mints.
+ */
+export async function mintCreator(mint: string, maxPages = 8): Promise<string | null> {
+  const key = new PublicKey(mint);
+  let before: string | undefined;
+  let oldest: string | undefined;
+  for (let page = 0; page < maxPages; page++) {
+    const sigs = await conn.getSignaturesForAddress(key, { before, limit: 1000 });
+    if (!sigs.length) break;
+    oldest = sigs[sigs.length - 1].signature;
+    if (sigs.length < 1000) {
+      // Raw RPC: the oldest tx may use a transaction version web3.js v1 can't decode.
+      const res = await fetch(CONFIG.rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getTransaction",
+          params: [oldest, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: "confirmed" }] }),
+        signal: AbortSignal.timeout(15_000),
+      }).then((r) => r.json() as Promise<any>);
+      const payer = res?.result?.transaction?.message?.accountKeys?.[0];
+      return typeof payer === "string" ? payer : null;
+    }
+    before = oldest;
+  }
+  return null;
+}

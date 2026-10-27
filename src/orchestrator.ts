@@ -9,8 +9,9 @@ import { size } from "./agents/sizer.js";
 import * as executor from "./agents/executor.js";
 import { loadPosition, logDecision, logTrade, savePosition } from "./agents/logger.js";
 import * as equity from "./agents/equity.js";
-import { signedUsd, sleep, usd } from "./util.js";
+import { signedUsd, usd } from "./util.js";
 import { tokenBalance } from "./data/solana.js";
+import { fundingTick } from "./funding.js";
 import type { Market } from "./data/market.js";
 import type { Mode } from "./types.js";
 
@@ -18,16 +19,42 @@ const seen = new Map<string, number>(); // mint -> last time we decided on it
 const recentlyDecided = (mint: string) => Date.now() - (seen.get(mint) ?? 0) < CONFIG.recheckFilteredAfterMs;
 let busy = false; // true while a swap is in flight; blocks mode switches
 
+// Mode changes are queued and applied by the loop between scans, never in the middle of one,
+// so a token checked and sized in paper can't end up bought with real money (and vice versa).
+let pendingMode: Mode | null = null;
+let wake: (() => void) | null = null;
+const nap = (ms: number) =>
+  new Promise<void>((r) => {
+    const t = setTimeout(r, ms);
+    wake = () => (clearTimeout(t), r());
+  });
+
+/** Called right after the wallet is connected from the dashboard: go live as soon as we're flat. */
+export function goLiveWhenFlat() {
+  pendingMode = "live";
+  if (state.position) update((s) => (s.notice = "wallet connected · goes LIVE after the open paper position closes"));
+  wake?.();
+}
+
 export function setMode(mode: Mode): string | null {
-  if (mode === state.mode) return null;
+  if (mode === state.mode && !pendingMode) return null;
   if (state.position || busy) return "close the open position before switching mode";
-  if (mode === "live" && !walletPublicKey()) return "live needs SOLANA_PRIVATE_KEY in .env";
+  if (mode === "live" && !walletPublicKey()) return "connect your Phantom wallet first (setup card)";
+  pendingMode = mode;
+  wake?.();
+  return null;
+}
+
+async function applyPendingMode() {
+  if (!pendingMode || state.position || busy) return;
+  const mode = pendingMode;
+  pendingMode = null;
+  if (mode === state.mode) return;
   update((s) => {
     s.mode = mode;
     s.notice = mode === "live" ? "LIVE · real funds" : "paper · simulated fills";
   });
-  void equity.startSession(mode, { resume: false });
-  return null;
+  await equity.startSession(mode, { resume: false });
 }
 
 async function manageOpenPosition(market: Market) {
@@ -133,10 +160,13 @@ export async function run(market: Market) {
   for (;;) {
     try {
       if (state.position) await manageOpenPosition(market);
-      else await hunt(market);
+      else {
+        await applyPendingMode();
+        if (await fundingTick()) await hunt(market);
+      }
     } catch (e) {
       console.error("[loop]", redact(String((e as Error)?.message ?? e)));
     }
-    await sleep(state.position ? CONFIG.monitorEveryMs : CONFIG.scanEveryMs);
+    await nap(state.position ? CONFIG.monitorEveryMs : CONFIG.scanEveryMs);
   }
 }

@@ -74,6 +74,7 @@ function render() {
   t.className = "pill " + S.mode;
   $("paperState").textContent = S.mode === "paper" ? "on" : "off";
   t.querySelector(".seg-live").lastChild.textContent = S.mode === "live" ? "live" : "live off";
+  renderWallet();
   const n = $("notice");
   n.textContent = S.notice ? "· " + S.notice : "";
   n.className = "notice" + (S.mode === "live" ? " live" : "");
@@ -104,6 +105,19 @@ function render() {
 
   renderTrade();
   renderResult();
+}
+
+let setupDismissed = false;
+let justConnected = false; // keep the card open after connecting so step 4 (fund it) is seen
+function renderWallet() {
+  $("setup").classList.toggle("hidden", !((S.needsSetup && !setupDismissed) || justConnected));
+  $("openSetup").classList.toggle("hidden", !S.needsSetup || !setupDismissed);
+  $("walletBar").classList.toggle("hidden", !S.wallet);
+  if (!S.wallet) return;
+  if (!$("wbAddr").classList.contains("copied")) $("wbAddr").textContent = S.wallet.slice(0, 4) + "…" + S.wallet.slice(-4);
+  const f = S.funding;
+  $("wbBal").textContent = f ? `◎${f.sol.toFixed(3)} · ${usd(f.usdc)} USDC` : "";
+  $("wbWarn").classList.toggle("hidden", !f || f.usdc >= 5 || S.mode !== "live");
 }
 
 function renderCandidates() {
@@ -293,8 +307,45 @@ function connect() {
 }
 connect();
 
+// ---------- setup + wallet ----------
+$("setupLater").addEventListener("click", () => { setupDismissed = true; justConnected = false; renderWallet(); });
+$("openSetup").addEventListener("click", () => { setupDismissed = false; renderWallet(); });
+$("wbAddr").addEventListener("click", async () => {
+  if (!S?.wallet) return;
+  try { await navigator.clipboard.writeText(S.wallet); } catch { return; }
+  const b = $("wbAddr");
+  b.textContent = "copied ✓";
+  b.classList.add("copied");
+  setTimeout(() => { b.classList.remove("copied"); renderWallet(); }, 1200);
+});
+$("setupForm").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const input = $("setupKey"), msg = $("setupMsg"), go = $("setupGo");
+  if (!input.value.trim()) return;
+  go.disabled = true;
+  msg.className = "setup-msg";
+  msg.textContent = "connecting…";
+  try {
+    const r = await fetch("/api/setup" + location.search, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ secret: input.value }) });
+    const j = await r.json();
+    input.value = ""; // never keep the key in the page
+    if (!r.ok) throw new Error(j.error || "setup failed");
+    justConnected = true;
+    $("setupLater").textContent = "done · close";
+    $("setupForm").classList.add("hidden");
+    msg.className = "setup-msg ok";
+    msg.textContent = `connected ✓ ${j.address.slice(0, 4)}…${j.address.slice(-4)} · now send USDC or SOL to it (step 4)`;
+  } catch (e) {
+    msg.className = "setup-msg err";
+    msg.textContent = e.message;
+  } finally {
+    go.disabled = false;
+  }
+});
+
 $("modeToggle").addEventListener("click", () => {
   if (!S || !ws || ws.readyState !== 1) return;
+  if (S.needsSetup && S.mode === "paper") { setupDismissed = false; return renderWallet(); }
   const next = S.mode === "live" ? "paper" : "live";
   if (next === "live" && !confirm("Switch to LIVE? The bot will trade real funds from this wallet.")) return;
   ws.send(JSON.stringify({ type: "setMode", mode: next }));

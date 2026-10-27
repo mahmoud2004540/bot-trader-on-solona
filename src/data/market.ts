@@ -32,10 +32,14 @@ export const liveMarket: Market = {
   },
   mintFacts: sol.mintFacts,
   async devWalletPct(mint, facts) {
-    const { creator } = await rugReport(mint);
-    if (!creator || facts.supply === 0n) return null;
-    const held = await sol.tokenBalance(new PublicKey(creator), mint);
-    return (Number(held) / Number(facts.supply)) * 100;
+    // Two independent answers for "who is the dev": rugcheck's creator and the on-chain payer
+    // of the mint's first transaction. They can disagree, so the larger holding counts.
+    const creators = [(await rugReport(mint)).creator, await sol.mintCreator(mint).catch(() => null)];
+    const known = [...new Set(creators.filter((c): c is string => Boolean(c)))];
+    if (!known.length || facts.supply === 0n) return null;
+    let worst = 0;
+    for (const c of known) worst = Math.max(worst, Number(await sol.tokenBalance(new PublicKey(c), mint)) / Number(facts.supply) * 100);
+    return worst;
   },
   async sellTest(mint) {
     const holders = await sol.sellSimHolders(mint, (await rugReport(mint)).topHolderOwners);

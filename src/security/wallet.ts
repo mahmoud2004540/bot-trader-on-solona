@@ -16,12 +16,26 @@ export function loadWallet(): PublicKey | null {
   const raw = process.env.SOLANA_PRIVATE_KEY?.trim();
   delete process.env.SOLANA_PRIVATE_KEY;
   if (!raw) return null;
+  return useSecret(raw, "SOLANA_PRIVATE_KEY is set but");
+}
+
+/**
+ * One-time setup from the dashboard: the key pasted there (from Phantom → Show Private Key)
+ * is validated and loaded here, and server.ts saves it into .env, the same env var the
+ * bot reads on every start. It is never echoed back, logged or sent anywhere else.
+ */
+export function connectWallet(raw: string): PublicKey {
+  if (keypair) throw new Error("a wallet is already connected");
+  return useSecret(raw.trim(), "the pasted key");
+}
+
+function useSecret(raw: string, what: string): PublicKey {
   try {
     const bytes = raw.startsWith("[") ? Uint8Array.from(JSON.parse(raw)) : bs58.decode(raw);
     keypair = Keypair.fromSecretKey(bytes);
   } catch {
     // Do not echo the value or the parser error (which may contain it).
-    throw new Error("SOLANA_PRIVATE_KEY is set but could not be parsed (expected base58 or JSON byte array)");
+    throw new Error(`${what} could not be read as a Solana private key`);
   }
   // Keep the encodings so redact() can scrub them if they ever appear in a string.
   secretFingerprints = [raw, bs58.encode(keypair.secretKey)];

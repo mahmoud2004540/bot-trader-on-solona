@@ -65,7 +65,7 @@ export function logTrade(t: ClosedTrade) {
 // ---- terminal: the same numbered lines, coloured, on stdout ----
 const ANSI = { reset: "\x1b[0m", dim: "\x1b[2m", teal: "\x1b[36m", green: "\x1b[32m", red: "\x1b[31m", orange: "\x1b[33m" };
 function printToTerminal(e: LogEntry) {
-  const c = e.kind === "ENTER" ? ANSI.teal : e.kind === "EXIT" ? ((e.pnlUsd ?? 0) >= 0 ? ANSI.green : ANSI.red) : ANSI.red;
+  const c = e.kind === "INFO" ? ANSI.dim : e.kind === "ENTER" ? ANSI.teal : e.kind === "EXIT" ? ((e.pnlUsd ?? 0) >= 0 ? ANSI.green : ANSI.red) : ANSI.red;
   console.log(
     `${ANSI.dim}#${String(e.line).padStart(4, "0")}  ${hhmmss(e.ts)}${ANSI.reset}  ${c}${e.kind.padEnd(8)}${ANSI.reset}  ${e.ticker.padEnd(11)}  ${c}${e.detail}${ANSI.reset}\n` +
       `       ${ANSI.orange}${e.reason}${ANSI.reset}`,
@@ -87,6 +87,10 @@ export function loadPosition(mode: Mode): Position | null {
 
 export interface SessionRow { id: number; started_at: number; start_balance: number; mode: string }
 export const lastSession = () => db.prepare("SELECT * FROM sessions ORDER BY id DESC LIMIT 1").get() as SessionRow | undefined;
+/** Before the first trade, START follows deposits so the result isn't measured from $0. */
+export function setSessionStartBalance(bal: number) {
+  db.prepare("UPDATE sessions SET start_balance = ? WHERE id = (SELECT MAX(id) FROM sessions)").run(bal);
+}
 export function newSession(mode: Mode, startedAt: number, startBalance: number) {
   db.prepare("INSERT INTO sessions (started_at, start_balance, mode) VALUES (?,?,?)").run(startedAt, startBalance, mode);
 }

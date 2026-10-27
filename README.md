@@ -13,7 +13,40 @@ SCANNER ──flag──▶ RUG CHECK ──pass──▶ SIZER ──size──
 > slippage cap is never loosened). Use a **dedicated hot wallet** that holds only what you can
 > afford to lose. Run `npm run demo` first to see how it behaves.
 
-## Quick start
+## Zero-setup start (with Phantom)
+
+1. Install **Node.js 22+** from nodejs.org (once).
+2. Double-click **`Start Grok Bot.command`** (Mac) or **`Start Grok Bot.bat`** (Windows); on Linux run `./start.sh`.
+   It installs everything the first time, opens the dashboard and keeps running all night (auto-restart, computer kept awake).
+3. The dashboard shows a **Connect Phantom** card:
+   - in Phantom create a new account called **Grok Bot**,
+   - Settings → Manage Accounts → Grok Bot → **Show Private Key**, then copy it and paste it into the card,
+   - from your main Phantom account send **USDC or SOL** to Grok Bot, keeping at least 0.05 SOL in it for fees.
+
+That's it. The bot switches to LIVE by itself, waits until the money arrives, converts extra SOL to
+USDC, and starts trading. Every later start goes straight to live with no questions. You see the bot's
+balance in Phantom, and you **withdraw from Phantom** whenever you want; the bot itself never sends
+money anywhere.
+
+> Why not sign with Phantom directly? Phantom shows an approval pop-up for every transaction, so it
+> can't trade while you sleep. A separate Phantom account gives the bot its own key and keeps your
+> main wallet out of reach.
+
+### تشغيل سريع (بالعربي)
+
+1. نزّل **Node.js 22** أو أحدث من nodejs.org (مرة واحدة بس).
+2. دوس مرتين على **`Start Grok Bot.command`** (ماك) أو **`Start Grok Bot.bat`** (ويندوز).
+   هيسطّب كل حاجة أول مرة، ويفتح الداشبورد، ويفضل شغال طول الليل.
+3. في الداشبورد هتلاقي كارت **Connect Phantom**:
+   - في فانتوم اعمل حساب جديد اسمه **Grok Bot**،
+   - Settings ← Manage Accounts ← Grok Bot ← **Show Private Key**، انسخه والصقه في الكارت،
+   - من حسابك الأساسي في فانتوم ابعت **USDC أو SOL** لحساب Grok Bot، وخلّي فيه 0.05 SOL على الأقل للرسوم.
+
+خلاص كده. البوت بيتحول لـ LIVE لوحده، وبيستنى لحد ما الفلوس توصل، وبعدين يبدأ يتداول. تقدر تشوف
+الرصيد وتسحب من فانتوم في أي وقت، والبوت نفسه عمره ما بيبعت فلوس لأي حد.
+**استخدم فلوس تقدر تستغنى عنها بس.**
+
+## Quick start (manual)
 
 ```bash
 npm install
@@ -97,6 +130,14 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 
   There is no transfer or withdraw code anywhere. These checks were run against a real Jupiter swap
   transaction (allowed), a USDC overspend (blocked) and a SOL transfer to a foreign address (blocked).
+- **One-time wallet setup from the dashboard** (`POST /api/setup`) works only from this computer
+  (loopback address and a localhost Host header, so DNS rebinding can't reach it). It is same-origin
+  and JSON-only, so other websites can't trigger it. It only works while no wallet is connected, so a
+  connected key can't be replaced. The pasted key is written to `.env` (mode 600) as
+  `SOLANA_PRIVATE_KEY`, the same env var the bot reads on every start. It is never sent back, logged or
+  stored anywhere else, and the page clears the field immediately.
+- **Deposited SOL is converted with a normal Jupiter swap** inside the bot's own wallet. The guard is
+  told the exact SOL amount for that one swap; an undeclared or reused amount is blocked.
 - **Token metadata is untrusted.** Names and symbols are reduced to short alphanumeric labels
   (`untrustedLabel`). Descriptions, websites and socials are never fetched or read. The dashboard
   inserts every data value with `textContent`, never `innerHTML`.
@@ -113,14 +154,17 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `.env.example` | Every setting, documented. Copy it to `.env`. |
 | `.gitignore` | Keeps `.env`, `data/` (DB + log) and `node_modules` out of git. |
 | **src/** | |
-| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits; the first launch starts a new session, restarts resume it. |
+| `src/night.ts` | Overnight supervisor (`npm run night`): restarts the bot with backoff when it exits (the first launch starts a new session, restarts resume it), and keeps the computer from sleeping (caffeinate / SetThreadExecutionState / systemd-inhibit). |
+| `src/funding.ts` | Wallet watcher (live only). Shows SOL/USDC on the dashboard, holds trading quietly until there is at least $5 USDC, converts deposited SOL to USDC (keeping 0.05 SOL for fees), and moves START to the deposited amount before the first trade. |
+| `Start Grok Bot.command` / `Start Grok Bot.bat` / `start.sh` | Double-click launchers (Mac / Windows / Linux). They check Node, run `npm install` the first time, open the dashboard and run `npm run night`. |
+| `.gitattributes` | Keeps Windows line endings for the `.bat` and Unix line endings for the shell launchers. |
 | `src/index.ts` | Entry point. Loads the wallet, falls back to paper if there's no key, warns on low SOL, reads the starting balance, and starts the dashboard and the agent loop. |
 | `src/config.ts` | Every rule and threshold from the spec as constants (3x/7x/500/85%, 5% dev, 25–40%, 2% slippage, −12%/+36%), plus env settings. |
 | `src/types.ts` | Shared data shapes: `PairSnapshot`, `Candidate`, `MintFacts`, `RugResult`, `Quote`, `Position`, `ClosedTrade`, `LogEntry`. |
 | `src/util.ts` | Fetch with timeout, untrusted-label sanitising, money and percent formatting, bigint/UI unit conversion. |
 | `src/state.ts` | The single in-memory dashboard state plus `update()`/`setAgent()`. Changes are batched into one WebSocket broadcast every 150 ms. |
-| `src/orchestrator.ts` | The pipeline. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
-| `src/server.ts` | HTTP server for `public/` (with path-traversal guard) and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
+| `src/orchestrator.ts` | The pipeline. Mode changes are queued and applied between scans, so a token checked in paper can never be bought live. `restorePosition()` picks a saved position back up at boot. While flat: scan → rug check → size → enter → log. While in a position: monitor every 4 s → exit → log → equity. Also handles the mode switch (refused while a position is open or a swap is in flight). |
+| `src/server.ts` | HTTP server for `public/` (with path-traversal guard), the locked-down `/api/setup` wallet connection, and WebSocket `/ws`. It sends a state snapshot, the session log once (`history`), then one `log` message per decision, so the feed can hold the whole night. Also handles the `setMode` toggle and the optional token check. |
 | **src/agents/** | |
 | `src/agents/scanner.ts` | **Scanner.** Computes spikeX/volX from snapshots, applies the flag rule and LP ≥ 85%, and outputs candidate cards. Never trades. |
 | `src/agents/rugCheck.ts` | **Rug check.** Authorities, extensions, LP, dev wallet, holder sell simulation and round-trip tax check. Returns the exact failing reason. |
@@ -133,7 +177,7 @@ If an existing holder can't sell, neither could we. Nothing in this test is sign
 | `src/data/dexscreener.ts` | New Solana tokens from DexScreener's latest profiles and boosts, plus per-pair m5/h1/h6 volume and liquidity. |
 | `src/data/birdeye.ts` | Optional (`BIRDEYE_API_KEY`): new listings and holder counts. |
 | `src/data/rugcheck.ts` | rugcheck.xyz report: LP lock %, creator address, holder count, top holders (fallback for the sell simulation). Cached for 60 s. Authorities are **not** taken from here. |
-| `src/data/solana.ts` | RPC reads: mint authorities and Token-2022 extensions, token balances, and real holder wallets for the honeypot test. |
+| `src/data/solana.ts` | RPC reads: mint authorities and Token-2022 extensions, token balances, real holder wallets for the honeypot test, and the mint's creator (the payer of its first transaction). The dev-wallet check uses whichever of rugcheck's creator and this on-chain creator holds more. |
 | `src/data/jupiter.ts` | Quotes (2% slippage, response validated against the request, no platform fee), swap-transaction building (no fee account, no custom destination), and holder sell simulation. |
 | `src/data/sim.ts` | Synthetic market for `npm run demo`: random tokens, some deliberately rugged, plus a random-walk price. Paper only; uses its own `data/demo/` so it never mixes with real sessions. |
 | **src/security/** | |

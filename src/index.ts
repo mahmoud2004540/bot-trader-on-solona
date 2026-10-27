@@ -17,11 +17,12 @@ async function main() {
   let notice = mode === "live" ? "LIVE · real funds" : "paper · simulated fills";
   if (mode === "live" && !wallet) {
     mode = "paper";
-    notice = DEMO ? "demo · synthetic market, paper only" : "no SOLANA_PRIVATE_KEY — fell back to paper";
+    notice = DEMO ? "demo · synthetic market, paper only" : "connect Phantom to go live · paper until then";
   }
   update((s) => {
     s.mode = mode;
     s.liveAvailable = Boolean(wallet);
+    s.needsSetup = !wallet && !DEMO;
     s.wallet = wallet ? wallet.toBase58() : null;
     s.notice = notice;
   });
