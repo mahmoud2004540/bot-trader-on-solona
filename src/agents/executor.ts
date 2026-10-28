@@ -84,9 +84,14 @@ export async function open(
 
 /** Returns an exit reason when stop or target is hit, else null. Updates the mark. */
 export async function monitor(market: Market, pos: Position): Promise<string | null> {
-  const q = await market.quote(pos.mint, CONFIG.quoteMint, pos.tokens);
+  let q: Quote | null;
+  try {
+    q = await market.quote(pos.mint, CONFIG.quoteMint, pos.tokens);
+  } catch {
+    q = null; // Jupiter busy: check again next tick (every few seconds)
+  }
   if (!q) {
-    setAgent("executor", "LONG", `${pos.ticker} · no quote, holding`, false);
+    setAgent("executor", "LONG", `${pos.ticker} · price check delayed, holding`, false);
     return null;
   }
   pos.markUsd = toUi(q.outAmount, CONFIG.quoteDecimals);
