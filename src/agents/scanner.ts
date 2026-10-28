@@ -21,6 +21,11 @@ function previousWindow(p: PairSnapshot): number {
   return old ? old.m5 : Math.max(0, p.volH1 - p.volM5) / 11;
 }
 
+// Forget mints that haven't shown up for a while, so the map can't grow forever.
+function pruneHistory() {
+  for (const [mint, h] of history) if (!h.length || Date.now() - h[h.length - 1].at > 10 * 60_000) history.delete(mint);
+}
+
 function remember(p: PairSnapshot) {
   const h = (history.get(p.mint) ?? []).filter((x) => Date.now() - x.at < 10 * 60_000);
   h.push({ at: Date.now(), m5: p.volM5 });
@@ -31,13 +36,16 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
   setAgent("scanner", "SCAN", "scanning new pairs…");
   const pairs = await market.discover().catch(() => [] as PairSnapshot[]);
   update((s) => (s.checked += pairs.length));
+  pruneHistory();
   const flagged: Candidate[] = [];
 
   for (const p of pairs) {
     const prev = previousWindow(p);
     remember(p);
     if (skip(p.mint) || p.volM5 < C.minM5VolumeUsd) continue;
-    const spikeX = prev > 0 ? p.volM5 / prev : p.volM5 > 0 ? 99 : 0;
+    // No earlier volume at all (a pair minutes old): a spike can't be measured, so it doesn't
+    // count as one. Such tokens can still qualify through the 7x + 500 holders rule.
+    const spikeX = prev > 0 ? p.volM5 / prev : 0;
     const avg5m = p.volH6 / 72;
     const volX = avg5m > 0 ? p.volM5 / avg5m : 0;
     const spikeOk = spikeX >= C.minSpikeX;

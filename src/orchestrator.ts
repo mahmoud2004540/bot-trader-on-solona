@@ -10,7 +10,7 @@ import * as executor from "./agents/executor.js";
 import { loadPosition, logDecision, logTrade, savePosition } from "./agents/logger.js";
 import * as equity from "./agents/equity.js";
 import { signedUsd, usd } from "./util.js";
-import { tokenBalance } from "./data/solana.js";
+import { conn, tokenBalance } from "./data/solana.js";
 import type { Market } from "./data/market.js";
 import type { Mode } from "./types.js";
 
@@ -79,7 +79,26 @@ async function manageOpenPosition(market: Market) {
   }
 }
 
+/** Every trade needs SOL for fees, and the EXIT must always be affordable. */
+const MIN_SOL_FOR_NEW_TRADE = 0.02;
+
+async function solLow(): Promise<number | null> {
+  const me = walletPublicKey();
+  if (state.mode !== "live" || !me) return null;
+  const sol = (await conn.getBalance(me)) / 1e9;
+  return sol < MIN_SOL_FOR_NEW_TRADE ? sol : null;
+}
+
 async function hunt(market: Market) {
+  for (const [mint, at] of seen) if (Date.now() - at > CONFIG.recheckFilteredAfterMs) seen.delete(mint);
+  const low = await solLow().catch(() => null);
+  if (low !== null) {
+    // No new entries: a position we can't pay to exit would be stuck. Shown, not logged per token.
+    setAgent("executor", "FLAT", `need ≥ ${MIN_SOL_FOR_NEW_TRADE} SOL for fees · wallet has ${low.toFixed(4)}`);
+    update((s) => (s.notice = `LIVE · paused: send SOL for fees (have ${low.toFixed(4)}, need ≥ ${MIN_SOL_FOR_NEW_TRADE})`));
+    return;
+  }
+  if (state.mode === "live" && state.notice.startsWith("LIVE · paused")) update((s) => (s.notice = "LIVE · real funds"));
   const flagged = await scan(market, recentlyDecided);
   for (const c of flagged) {
     if (state.position) {

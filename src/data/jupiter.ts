@@ -73,7 +73,8 @@ export async function buildSwap(q: Quote, user: PublicKey) {
       userPublicKey: user.toBase58(),
       wrapAndUnwrapSol: true,
       dynamicComputeUnitLimit: true,
-      prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 2_000_000, priorityLevel: "high" } },
+      // cap 0.0005 SOL (~$0.1): still "high" priority, but a fee can't eat a small trade
+      prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 500_000, priorityLevel: "high" } },
     }),
   });
   if (status !== 200 || !r?.swapTransaction) throw new Error(`Jupiter /swap ${status}`);
