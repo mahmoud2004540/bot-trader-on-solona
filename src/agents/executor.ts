@@ -6,7 +6,7 @@
 // - Stop-loss -12%, take-profit +36% (3R). Mark price = what Jupiter would pay for the
 //   whole bag right now, so the stop reflects real exit liquidity, not a chart price.
 // - In paper mode fills are taken from Jupiter quotes and nothing is signed.
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { CONFIG } from "../config.js";
 import { setAgent, update } from "../state.js";
 import { fromUi, toUi, usd, signedUsd } from "../util.js";
@@ -122,6 +122,7 @@ export async function close(market: Market, mode: Mode, pos: Position, exitReaso
     const before = await tokenBalance(me, CONFIG.quoteMint);
     await swapLive(q, 0n); // a sell may not spend any USDC
     received = (await tokenBalance(me, CONFIG.quoteMint)) - before;
+    await reclaimRent(me, pos.mint);
   }
   return closedTrade(pos, tokens, toUi(received, CONFIG.quoteDecimals), slipPct(q.outAmount, received), exitReason);
 }
@@ -140,4 +141,41 @@ function closedTrade(pos: Position, tokens: bigint, proceedsUsd: number, exitSli
   };
   setAgent("executor", "FLAT", `closed ${pos.ticker} ${signedUsd(t.pnlUsd)}`);
   return t;
+}
+
+/** CloseAccount instruction (SPL Token / Token-2022): rent goes back to `me`, the owner. */
+export function closeAccountIx(account: PublicKey, me: PublicKey, tokenProgram: PublicKey) {
+  return new TransactionInstruction({
+    programId: tokenProgram,
+    keys: [
+      { pubkey: account, isSigner: false, isWritable: true },
+      { pubkey: me, isSigner: false, isWritable: true }, // destination of the rent
+      { pubkey: me, isSigner: true, isWritable: false }, // owner
+    ],
+    data: Buffer.from([9]),
+  });
+}
+
+/**
+ * After a full sell, close the now-empty token account so its ~0.002 SOL rent comes back
+ * instead of piling up trade after trade. Best effort: if it fails, the rent just stays locked.
+ * Goes through the same tx guard (CloseAccount is only allowed with the rent paid to us).
+ */
+async function reclaimRent(me: PublicKey, mint: string) {
+  try {
+    const res = await conn.getParsedTokenAccountsByOwner(me, { mint: new PublicKey(mint) });
+    const empty = res.value.filter((a) => a.account.data.parsed.info.tokenAmount.amount === "0");
+    if (!empty.length) return;
+    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+    const msg = new TransactionMessage({
+      payerKey: me,
+      recentBlockhash: blockhash,
+      instructions: empty.map((a) => closeAccountIx(a.pubkey, me, a.account.owner)),
+    }).compileToV0Message();
+    const signed = await signGuarded(conn, new VersionedTransaction(msg));
+    const sig = await conn.sendRawTransaction(signed.serialize());
+    await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  } catch {
+    // harmless: ~0.002 SOL stays in the empty account
+  }
 }

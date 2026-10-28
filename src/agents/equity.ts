@@ -35,7 +35,7 @@ export async function startSession(mode: Mode, opts: { resume: boolean }) {
       s.wins = h.trades.filter((t) => t.pnl_usd >= 0).length;
       s.losses = s.trades - s.wins;
       s.equityCurve = [{ t: last.started_at, v: last.start_balance }, ...h.curve.map((c) => ({ t: c.ts, v: c.balance }))];
-      s.log = h.log;
+      s.log = h.log.slice(-3000);
       s.sessionLines = h.log.length;
       s.loggerLine = h.log.at(-1)?.line ?? s.loggerLine;
       s.filtered = h.log.filter((e) => e.kind === "FILTERED").length;

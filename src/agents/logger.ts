@@ -47,6 +47,8 @@ export function logDecision(kind: LogKind, ticker: string, mint: string, detail:
   bus.emit("log", e);
   update((s) => {
     s.log.push(e);
+    // the dashboard keeps the latest 3000 decisions in memory; night.log + SQLite keep all
+    if (s.log.length > 3000) s.log.splice(0, s.log.length - 3000);
     s.loggerLine = e.line;
     s.sessionLines++;
   });
