@@ -61,5 +61,5 @@ export const CONFIG = {
   sizer: { minPct: 25, maxPct: 40, fullStrengthSpikeX: 10 },
 
   // ---- 4. EXECUTOR ----
-  executor: { slippageBps: 200, stopLossPct: -12, takeProfitPct: 36 }, // 3R with R = 12%
+  executor: { slippageBps: 300, stopLossPct: -12, takeProfitPct: 36 }, // 3% price impact cap (was 2%)
 } as const;
