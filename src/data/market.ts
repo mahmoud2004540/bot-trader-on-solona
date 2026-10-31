@@ -19,9 +19,19 @@ export interface Market {
   quote(inputMint: string, outputMint: string, amount: bigint): Promise<Quote | null>;
 }
 
+// Watchlist: the feeds only show a token for a few minutes, but its volume spike usually
+// comes later. Every mint found in the last 3 hours is re-read on each scan, so the scanner
+// can compare this 5-minute volume with the previous 5 minutes it measured itself.
+const WATCH_MS = 3 * 3600_000;
+const WATCH_MAX = 600; // 20 DexScreener requests per scan, well under its rate limit
+const watch = new Map<string, number>(); // mint -> last time a feed listed it
+
 export const liveMarket: Market = {
   async discover() {
-    const mints = [...new Set([...(await dex.latestMints()), ...(await birdeye.newListings())])];
+    const now = Date.now();
+    for (const m of [...(await dex.latestMints()), ...(await birdeye.newListings())]) watch.set(m, now);
+    for (const [m, at] of watch) if (now - at > WATCH_MS) watch.delete(m);
+    const mints = [...watch].sort((a, b) => b[1] - a[1]).slice(0, WATCH_MAX).map(([m]) => m);
     return dex.pairsFor(mints);
   },
   async holders(mint) {

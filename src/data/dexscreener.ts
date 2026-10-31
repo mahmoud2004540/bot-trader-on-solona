@@ -4,11 +4,13 @@ import type { PairSnapshot } from "../types.js";
 
 const BASE = "https://api.dexscreener.com";
 
-/** Fresh Solana mints from DexScreener's "latest profiles" and "latest boosts" feeds. */
+/** Solana mints from DexScreener's latest profiles, latest + top boosts and community takeovers. */
 export async function latestMints(): Promise<string[]> {
   const feeds = await Promise.allSettled([
     fetchJson<any[]>(`${BASE}/token-profiles/latest/v1`),
     fetchJson<any[]>(`${BASE}/token-boosts/latest/v1`),
+    fetchJson<any[]>(`${BASE}/token-boosts/top/v1`),
+    fetchJson<any[]>(`${BASE}/community-takeovers/latest/v1`),
   ]);
   const mints = new Set<string>();
   for (const f of feeds)
