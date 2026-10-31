@@ -9,6 +9,7 @@
 import { CONFIG } from "../config.js";
 import { setAgent, update } from "../state.js";
 import { ticker } from "../util.js";
+import { rugcheckHealth } from "../data/rugcheck.js";
 import type { Market } from "../data/market.js";
 import type { Candidate, PairSnapshot } from "../types.js";
 
@@ -38,6 +39,7 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
   update((s) => (s.checked += pairs.length));
   pruneHistory();
   const flagged: Candidate[] = [];
+  let lpUnknown = 0;
 
   for (const p of pairs) {
     const prev = previousWindow(p);
@@ -53,7 +55,11 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
     if (!spikeOk && !volOk) continue;
 
     const [lp, holders] = await Promise.all([market.lpLockedPct(p.mint), market.holders(p.mint)]);
-    if (lp === null || lp < C.minLpLockedPct) continue;
+    if (lp === null) {
+      lpUnknown++;
+      continue;
+    }
+    if (lp < C.minLpLockedPct) continue;
     if (!spikeOk && (holders ?? 0) < C.minHoldersForVolX) continue;
 
     const c: Candidate = {
@@ -74,7 +80,12 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
   flagged.sort((a, b) => b.spikeX - a.spikeX);
   update((s) => {
     s.candidates = [...flagged, ...s.candidates.filter((c) => !flagged.some((f) => f.mint === c.mint))].slice(0, 8);
-    if (!flagged.length) s.agents.scanner.last = `${pairs.length} pairs · nothing flagged`;
+    // Say why nothing passes when the LP lock source is down, instead of failing silently.
+    const rugcheckDown = lpUnknown > 0 && Date.now() - rugcheckHealth.lastOk > 15 * 60_000;
+    if (!flagged.length)
+      s.agents.scanner.last = rugcheckDown
+        ? `rugcheck.xyz not answering · LP lock can't be verified · ${lpUnknown} spikes skipped`
+        : `${pairs.length} pairs · nothing flagged`;
   });
   return flagged;
 }
