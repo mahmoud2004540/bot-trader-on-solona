@@ -47,6 +47,9 @@ export const CONFIG = {
     minHoldersForVolX: 500, // ...with 500+ holders
     minLpLockedPct: 85, // AND LP >= 85% locked
     minM5VolumeUsd: 1_000, // ignore dust pairs where "3x" of $10 is noise
+    // Experiment (paper-tested): don't chase a pump. If the price already rose more than
+    // this in the last 5 minutes, the spike is usually the top, and the -12% stop gets hit.
+    maxPriceUpM5Pct: 30,
   },
 
   // ---- 2. RUG CHECK ----

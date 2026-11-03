@@ -38,6 +38,7 @@ export async function pairsFor(mints: string[]): Promise<PairSnapshot[]> {
         name: String(p.baseToken?.name ?? ""), // untrusted
         pairAddress: String(p.pairAddress),
         priceUsd: Number(p.priceUsd ?? 0),
+        priceChangeM5: Number(p.priceChange?.m5 ?? 0),
         liquidityUsd: Number(p.liquidity?.usd ?? 0),
         volM5: Number(p.volume?.m5 ?? 0),
         volH1: Number(p.volume?.h1 ?? 0),

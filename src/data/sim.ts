@@ -38,7 +38,7 @@ setInterval(() => { for (const t of tokens.values()) t.price *= 1 + rnd(-0.03, 0
 export const simMarket: Market = {
   async discover(): Promise<PairSnapshot[]> {
     const fresh = Array.from({ length: Math.floor(rnd(0, 3)) }, spawn);
-    return fresh.map((t) => ({ mint: t.mint, symbol: t.symbol, name: t.symbol, pairAddress: "sim", priceUsd: t.price, liquidityUsd: 50_000, volM5: t.m5, volH1: t.h1, volH6: t.h6 }));
+    return fresh.map((t) => ({ mint: t.mint, symbol: t.symbol, name: t.symbol, pairAddress: "sim", priceUsd: t.price, liquidityUsd: 50_000, volM5: t.m5, volH1: t.h1, volH6: t.h6, priceChangeM5: rnd(-10, 50) }));
   },
   async holders(m) { return tokens.get(m)?.holders ?? null; },
   async lpLockedPct(m) { return tokens.get(m)?.lp ?? null; },

@@ -14,6 +14,8 @@ export interface PairSnapshot {
   volM5: number;
   volH1: number;
   volH6: number;
+  /** price change over the last 5 minutes, in percent */
+  priceChangeM5: number;
 }
 
 /** A token the scanner flagged. */
