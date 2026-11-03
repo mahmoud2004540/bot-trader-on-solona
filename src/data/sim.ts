@@ -61,6 +61,6 @@ export const simMarket: Market = {
     const out = isBuy
       ? fromUi((Number(amount) / 1e6 / t.price) * (1 - impact), t.decimals)
       : fromUi((Number(amount) / 10 ** t.decimals) * t.price * (1 - impact), 6);
-    return { inAmount: amount, outAmount: out, priceImpactPct: impact * 100, raw: null };
+    return { inAmount: amount, outAmount: out, priceImpactPct: impact * 100, raw: null, at: Date.now() };
   },
 };

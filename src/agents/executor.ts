@@ -20,10 +20,21 @@ import type { Candidate, ClosedTrade, Mode, Position, Quote } from "../types.js"
 const E = CONFIG.executor;
 const capPct = E.slippageBps / 100;
 
+const MAX_QUOTE_AGE_MS = 15_000;
+
+/**
+ * Last checks before anything is signed: the quote must be fresh and carry exactly our
+ * slippage cap. (The token and the amounts are checked when the quote is fetched; the
+ * transaction itself is checked by the tx guard.) Returns the confirmed signature.
+ */
 async function swapLive(q: Quote, maxQuoteSpend: bigint): Promise<string> {
   const me = walletPublicKey();
   if (!me) throw new Error("live mode without wallet");
+  const slip = Number((q.raw as { slippageBps?: unknown } | null)?.slippageBps);
+  if (slip !== CONFIG.executor.slippageBps) throw new Error(`quote slippage ${slip} bps ≠ cap ${CONFIG.executor.slippageBps} bps, not signed`);
   const { tx, lastValidBlockHeight } = await buildSwap(q, me);
+  const age = Date.now() - q.at;
+  if (age > MAX_QUOTE_AGE_MS) throw new Error(`quote ${(age / 1000).toFixed(0)}s old (max ${MAX_QUOTE_AGE_MS / 1000}s), not signed`);
   allowQuoteSpend(maxQuoteSpend);
   const signed = await signGuarded(conn, tx);
   const sig = await conn.sendRawTransaction(signed.serialize(), { maxRetries: 3 });
@@ -53,11 +64,14 @@ export async function open(
   if (q.priceImpactPct > capPct) return { error: `price impact ${q.priceImpactPct.toFixed(1)}% > cap ${capPct}%` };
 
   let tokens = q.outAmount;
+  let entrySig: string | undefined;
   if (mode === "live") {
     const me = walletPublicKey()!;
+    const have = await tokenBalance(me, CONFIG.quoteMint);
+    if (have < amountIn) return { error: `USDC balance ${usd(toUi(have, CONFIG.quoteDecimals))} < size ${usd(sizeUsd)}` };
     const before = await tokenBalance(me, c.mint);
     try {
-      await swapLive(q, amountIn);
+      entrySig = await swapLive(q, amountIn);
     } catch (e) {
       // A confirmation timeout does not mean the swap didn't land: never lose track of a bag.
       if ((await tokenBalance(me, c.mint)) <= before) throw e;
@@ -77,6 +91,7 @@ export async function open(
     sizePctOfEquity: sizePct,
     entryReason,
     markUsd: sizeUsd,
+    entrySig,
   };
   setAgent("executor", "LONG", `long ${c.ticker} · ${usd(sizeUsd)}`);
   return pos;
@@ -118,16 +133,17 @@ export async function close(market: Market, mode: Mode, pos: Position, exitReaso
   const q = await market.quote(pos.mint, CONFIG.quoteMint, tokens);
   if (!q) throw new Error("no Jupiter route to exit");
   let received = q.outAmount;
+  let exitSig: string | undefined;
   if (mode === "live" && me) {
     const before = await tokenBalance(me, CONFIG.quoteMint);
-    await swapLive(q, 0n); // a sell may not spend any USDC
+    exitSig = await swapLive(q, 0n); // a sell may not spend any USDC
     received = (await tokenBalance(me, CONFIG.quoteMint)) - before;
     await reclaimRent(me, pos.mint);
   }
-  return closedTrade(pos, tokens, toUi(received, CONFIG.quoteDecimals), slipPct(q.outAmount, received), exitReason);
+  return closedTrade(pos, tokens, toUi(received, CONFIG.quoteDecimals), slipPct(q.outAmount, received), exitReason, exitSig);
 }
 
-function closedTrade(pos: Position, tokens: bigint, proceedsUsd: number, exitSlipPct: number, exitReason: string): ClosedTrade {
+function closedTrade(pos: Position, tokens: bigint, proceedsUsd: number, exitSlipPct: number, exitReason: string, exitSig?: string): ClosedTrade {
   const t: ClosedTrade = {
     ...pos,
     markUsd: proceedsUsd,
@@ -138,6 +154,7 @@ function closedTrade(pos: Position, tokens: bigint, proceedsUsd: number, exitSli
     pnlUsd: proceedsUsd - pos.costUsd,
     pnlPct: (proceedsUsd / pos.costUsd - 1) * 100,
     exitReason,
+    exitSig,
   };
   setAgent("executor", "FLAT", `closed ${pos.ticker} ${signedUsd(t.pnlUsd)}`);
   return t;

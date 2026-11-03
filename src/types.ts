@@ -55,6 +55,7 @@ export interface Quote {
   outAmount: bigint;
   priceImpactPct: number;
   raw: unknown; // Jupiter's quoteResponse, passed back verbatim to /swap
+  at: number; // when the quote was fetched; stale quotes are never signed
 }
 
 export interface Position {
@@ -69,6 +70,8 @@ export interface Position {
   sizePctOfEquity: number;
   entryReason: string;
   markUsd: number;
+  /** confirmed on-chain buy transaction (live only) */
+  entrySig?: string;
 }
 
 export interface ClosedTrade extends Position {
@@ -79,6 +82,8 @@ export interface ClosedTrade extends Position {
   pnlUsd: number;
   pnlPct: number;
   exitReason: string;
+  /** confirmed on-chain sell transaction (live only) */
+  exitSig?: string;
 }
 
 export type LogKind = "ENTER" | "EXIT" | "FILTERED" | "INFO";

@@ -29,6 +29,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS open_position (id INTEGER PRIMARY KEY CHECK (id = 1), mode TEXT, json TEXT);
 `);
 
+// Older databases: add the transaction-signature columns if they're missing.
+for (const col of ["entry_sig", "exit_sig"])
+  try {
+    db.exec(`ALTER TABLE trades ADD COLUMN ${col} TEXT`);
+  } catch {
+    // already there
+  }
+
 let line = Number((db.prepare("SELECT MAX(line) AS m FROM decisions").get() as { m: number | null }).m ?? 0);
 
 const hhmmss = (ts: number) => new Date(ts).toTimeString().slice(0, 8);
@@ -59,9 +67,11 @@ export function logDecision(kind: LogKind, ticker: string, mint: string, detail:
 export function logTrade(t: ClosedTrade) {
   db.prepare(
     `INSERT INTO trades (mint,ticker,mode,opened_at,closed_at,cost_usd,proceeds_usd,entry_price,exit_price,
-      entry_slip_pct,exit_slip_pct,size_pct,pnl_usd,pnl_pct,entry_reason,exit_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      entry_slip_pct,exit_slip_pct,size_pct,pnl_usd,pnl_pct,entry_reason,exit_reason,entry_sig,exit_sig)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).run(t.mint, t.ticker, state.mode, t.openedAt, t.closedAt, t.costUsd, t.proceedsUsd, t.entryPrice, t.exitPrice,
-    t.entrySlipPct, t.exitSlipPct, t.sizePctOfEquity, t.pnlUsd, t.pnlPct, t.entryReason, t.exitReason);
+    t.entrySlipPct, t.exitSlipPct, t.sizePctOfEquity, t.pnlUsd, t.pnlPct, t.entryReason, t.exitReason,
+    t.entrySig ?? null, t.exitSig ?? null);
 }
 
 // ---- terminal: the same numbered lines, coloured, on stdout ----
