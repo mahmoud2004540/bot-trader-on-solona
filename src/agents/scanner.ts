@@ -2,6 +2,7 @@
 //
 // Flag when:  (spike >= 3x vs previous 5 min  OR  vol >= 7x with 500+ holders)
 //        AND  LP >= 85% locked
+//        AND  price not already up > 30% in the last 5 min (experiment: don't buy the top)
 //
 // spikeX = current 5m volume / previous 5m volume. The previous window comes from our own
 //          snapshot taken ~5 minutes ago; on first sight we estimate it as (h1 - m5) / 11.
@@ -40,11 +41,16 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
   pruneHistory();
   const flagged: Candidate[] = [];
   let lpUnknown = 0;
+  let chased = 0; // already pumped > maxPriceUpM5Pct in 5 min: not chased
 
   for (const p of pairs) {
     const prev = previousWindow(p);
     remember(p);
     if (skip(p.mint) || p.volM5 < C.minM5VolumeUsd) continue;
+    if (p.priceChangeM5 > C.maxPriceUpM5Pct) {
+      chased++;
+      continue;
+    }
     // No earlier volume at all (a pair minutes old): a spike can't be measured, so it doesn't
     // count as one. Such tokens can still qualify through the 7x + 500 holders rule.
     const spikeX = prev > 0 ? p.volM5 / prev : 0;
@@ -85,7 +91,7 @@ export async function scan(market: Market, skip: (mint: string) => boolean): Pro
     if (!flagged.length)
       s.agents.scanner.last = rugcheckDown
         ? `rugcheck.xyz not answering · LP lock can't be verified · ${lpUnknown} spikes skipped`
-        : `${pairs.length} pairs · nothing flagged`;
+        : `${pairs.length} pairs · nothing flagged${chased ? ` · ${chased} already pumped > ${C.maxPriceUpM5Pct}% (not chased)` : ""}`;
   });
   return flagged;
 }
