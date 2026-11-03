@@ -61,7 +61,7 @@ export async function quote(inputMint: string, outputMint: string, amount: bigin
   if (status !== 200 || !r?.outAmount) return null;
   // Our own request params must come back unchanged; anything else is not trusted.
   if (r.inputMint !== inputMint || r.outputMint !== outputMint || r.platformFee) return null;
-  return { inAmount: BigInt(r.inAmount), outAmount: BigInt(r.outAmount), priceImpactPct: Number(r.priceImpactPct) * 100, raw: r };
+  return { inAmount: BigInt(r.inAmount), outAmount: BigInt(r.outAmount), priceImpactPct: Number(r.priceImpactPct) * 100, raw: r, at: Date.now() };
 }
 
 /** Build (not sign, not send) a swap transaction for `user`. No fee account, no custom destination. */
